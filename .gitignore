@@ -1,0 +1,7 @@
+screenshots/
+.idea/
+.qodo/
+data/
+backups/
+*.sql.gz
+.env

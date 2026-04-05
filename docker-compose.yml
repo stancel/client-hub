@@ -1,0 +1,27 @@
+services:
+  client-hub-db:
+    image: mariadb:11
+    container_name: client-hub-db
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-clienthub_db}
+      MARIADB_USER: ${MARIADB_USER:-clienthub}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - client-hub-net
+
+networks:
+  client-hub-net:
+    name: client-hub-net
