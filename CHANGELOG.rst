@@ -4,6 +4,20 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-05d:
+
+2026-04-05 — Phase 3 Complete: Test Data and Validation
+======================================================================
+
+- Inserted realistic test data: 5 contacts (2 clients, 1 prospect,
+  1 lead, 1 vendor), 2 organizations, 4 orders with line items,
+  3 invoices, 3 payments, 7 communications, 3 notes
+- Ran 11 validation queries — all passed with zero issues:
+  FK integrity, orphan checks, CTI phone lookup, Chatwoot email
+  lookup, prospect→client conversion, order→invoice→payment chain,
+  junction tables, channel prefs, data provenance, status audit trail
+- Created ``migrations/012_seed_test_data.sql`` for reproducibility
+
 .. _client-hub-changelog-2026-04-05c:
 
 2026-04-05 — Phase 1 Complete: Data Model Design

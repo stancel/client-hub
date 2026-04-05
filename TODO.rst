@@ -18,35 +18,39 @@ Phase 1 — Data Model Design [COMPLETE]
 
 .. _client-hub-todo-phase2:
 
-Phase 2 — Schema Implementation [IN PROGRESS]
+Phase 2 — Schema Implementation [COMPLETE]
 ======================================================================
 
-- [ ] Create ``migrations/`` directory with numbered SQL files
-- [ ] Write DDL for lookup tables (dependency-free, created first)
-- [ ] Write DDL for core entity tables (contacts, organizations)
-- [ ] Write DDL for contact detail tables (phones, emails, addresses)
-- [ ] Write DDL for junction tables
-- [ ] Write DDL for orders, order_items, order_status_history
-- [ ] Write DDL for invoices, payments
-- [ ] Write DDL for communications, contact_notes
-- [ ] Execute all migrations against ``dev_schema`` via MCP tools
-- [ ] Verify schema with ``search_objects`` MCP tool
-- [ ] Seed lookup tables with initial reference data
+- [x] Create ``migrations/`` directory with numbered SQL files
+- [x] Write DDL for lookup tables (dependency-free, created first)
+- [x] Write DDL for core entity tables (contacts, organizations)
+- [x] Write DDL for contact detail tables (phones, emails, addresses)
+- [x] Write DDL for junction tables
+- [x] Write DDL for orders, order_items, order_status_history
+- [x] Write DDL for invoices, payments
+- [x] Write DDL for communications, contact_notes
+- [x] Execute all migrations against ``dev_schema`` via MCP tools
+- [x] Verify schema with ``search_objects`` MCP tool (30 tables, 36 FKs)
+- [x] Seed lookup tables with initial reference data (58 rows)
 
 .. _client-hub-todo-phase3:
 
-Phase 3 — Test Data and Validation
+Phase 3 — Test Data and Validation [COMPLETE]
 ======================================================================
 
-- [ ] Create seed data exercising all relationships and edge cases
-- [ ] Insert test clients, prospects, orders, bookings, communications
-- [ ] Validate all foreign keys resolve correctly
-- [ ] Validate no orphaned records
-- [ ] Test prospect-to-client conversion flow
-- [ ] Test CTI phone number lookup use case
-- [ ] Test Chatwoot email lookup use case
-- [ ] Test junction tables (tags, marketing sources)
-- [ ] Document and fix any issues found
+- [x] Create seed data exercising all relationships and edge cases
+- [x] Insert test clients, prospects, orders, bookings, communications
+- [x] Validate all foreign keys resolve correctly (0 orphans)
+- [x] Validate no orphaned records across all 10 child tables
+- [x] Test prospect-to-client conversion flow (James Smith)
+- [x] Test CTI phone number lookup use case
+- [x] Test Chatwoot email lookup use case
+- [x] Test junction tables (tags, marketing sources)
+- [x] Test order→invoice→payment chain
+- [x] Test channel preferences with opt-in compliance
+- [x] Test data provenance tracking (enriched vs manual)
+- [x] Test order status history audit trail
+- [x] All 11 validations passed with zero issues
 
 .. _client-hub-todo-phase4:
 
