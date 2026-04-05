@@ -10,10 +10,10 @@ Client Hub
 Overview
 **********************************************************************
 
-Client Hub is a centralized, business-agnostic MariaDB database that
-serves as a single source of truth for client data, prospect data,
-orders and bookings, marketing channel preferences, and communication
-history. External programs integrate through a wrapper REST API layer.
+Client Hub is a centralized, business-agnostic database that serves as
+a single source of truth for client data, prospect data, orders and
+bookings, marketing channel preferences, and communication history.
+External programs integrate through a wrapper REST API layer.
 
 **Initial use case:** Embroidery business CRM. **Future verticals:**
 Dentist offices, lawn care, pressure washing, and other service
@@ -30,16 +30,18 @@ Quick Info
 
    * - **App Location**
      - ``~/docker/client-hub/``
-   * - **MariaDB Port**
-     - ``3307`` (host) → ``3306`` (container)
+   * - **Database**
+     - Shared MariaDB 12.2.2 at ``~/docker/mariadb/``
+   * - **DB Host**
+     - ``mariadb:3306`` (Docker DNS) / ``10.0.1.220:3306`` (host)
+   * - **DB Name**
+     - ``clienthub_db``
    * - **API Port**
      - ``8800`` (planned — Phase 2)
-   * - **Local URL**
-     - http://10.0.1.220:8800 (not yet active)
    * - **Public URL**
      - None (planned for Phase 4)
-   * - **Database**
-     - MariaDB 11
+   * - **MCP Tools**
+     - ``apisix-mysql`` (``execute_sql``, ``search_objects``)
    * - **Status**
      - Phase 1 — Data model design
 
@@ -49,18 +51,21 @@ Quick Info
 Architecture
 **********************************************************************
 
-Phase 1 (current) deploys a single MariaDB container. Phase 2 will
-add a containerized REST API service.
+Client Hub uses the shared MariaDB instance at ``~/docker/mariadb/``
+rather than running its own database container. Schema design is done
+through the MySQL MCP Server (DBHub) at ``~/docker/mysql-mcp-server/``.
+Phase 2 will add a containerized REST API service.
 
 .. code-block:: text
 
    ┌─────────────────────────────────┐
-   │         client-hub-db           │
-   │   MariaDB 11 (port 3307)       │
-   │   Database: clienthub_db       │
+   │  Shared MariaDB 12.2.2         │
+   │  ~/docker/mariadb/             │
+   │  Database: clienthub_db        │
+   │  Port: 3306                    │
    └─────────────────────────────────┘
               ▲
-              │ (Phase 2)
+              │ my-main-net (Phase 2)
    ┌─────────────────────────────────┐
    │        client-hub-api           │
    │   REST API (port 8800)         │
@@ -72,6 +77,15 @@ add a containerized REST API service.
    │       │ Ninja │     │          │
    └──────┴──────┴──────┴───────────┘
 
+.. _client-hub-related-projects:
+
+**********************************************************************
+Related Projects
+**********************************************************************
+
+- ``~/docker/mariadb/`` — Shared MariaDB 12.2.2 database server
+- ``~/docker/mysql-mcp-server/`` — DBHub MCP server for SQL execution
+
 .. _client-hub-key-commands:
 
 **********************************************************************
@@ -80,20 +94,17 @@ Key Commands
 
 .. code-block:: bash
 
-   # Start
-   cd ~/docker/client-hub && docker compose up -d
+   # Connect to MariaDB (from host)
+   mariadb -h 10.0.1.220 -P 3306 -u clienthub -p clienthub_db
 
-   # Status
-   docker compose ps
+   # Connect via container
+   docker exec -it mariadb mariadb -u clienthub -p clienthub_db
 
-   # Logs
-   docker compose logs --tail=50
+   # Backup
+   docker exec mariadb mariadb-dump -u root -p clienthub_db > backups/clienthub_$(date +%Y%m%d_%H%M%S).sql
 
-   # Connect to MariaDB
-   docker compose exec client-hub-db mariadb -u clienthub -p clienthub_db
-
-   # Stop
-   docker compose down
+   # Check shared MariaDB status
+   cd ~/docker/mariadb && docker compose ps
 
 .. _client-hub-integration-targets:
 
@@ -114,4 +125,4 @@ References
 
 - `MariaDB Docker Hub <https://hub.docker.com/_/mariadb>`_
 - `MariaDB Documentation <https://mariadb.com/kb/en/documentation/>`_
-- `MariaDB 11 Release Notes <https://mariadb.com/kb/en/release-notes-mariadb-11-series/>`_
+- `MariaDB 12 Release Notes <https://mariadb.com/kb/en/release-notes-mariadb-12-series/>`_

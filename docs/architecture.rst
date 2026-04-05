@@ -16,77 +16,54 @@ across multiple business verticals. External applications interact
 exclusively through a REST API wrapper layer — no direct database
 access is permitted from external systems.
 
+Client Hub does **not** run its own database. It uses the shared
+MariaDB instance at ``~/docker/mariadb/`` and the MySQL MCP Server
+at ``~/docker/mysql-mcp-server/`` for schema design.
+
+.. _client-hub-arch-infrastructure:
+
+**********************************************************************
+Infrastructure Dependencies
+**********************************************************************
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Project
+     - Location
+     - Role
+   * - MariaDB
+     - ``~/docker/mariadb/``
+     - Shared database server (MariaDB 12.2.2, port 3306)
+   * - MySQL MCP Server
+     - ``~/docker/mysql-mcp-server/``
+     - DBHub MCP tools (``execute_sql``, ``search_objects``)
+
 .. _client-hub-arch-containers:
 
 **********************************************************************
 Container Layout
 **********************************************************************
 
+Phase 1 (current): No containers — schema design only.
+
+Phase 2 (planned):
+
 .. list-table::
    :header-rows: 1
-   :widths: 20 20 20 20 20
+   :widths: 25 20 15 15 25
 
    * - Container
      - Image
      - Host Port
      - Container Port
      - Purpose
-   * - client-hub-db
-     - mariadb:11
-     - 3307
-     - 3306
-     - MariaDB database
    * - client-hub-api
      - TBD
      - 8800
      - 8800
-     - REST API wrapper (Phase 2)
-
-.. _client-hub-arch-ports:
-
-**********************************************************************
-Port Mappings
-**********************************************************************
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 20 20 40
-
-   * - Service
-     - Host Port
-     - Container Port
-     - Notes
-   * - MariaDB
-     - 3307
-     - 3306
-     - Port 3306 already in use by another service
-   * - REST API
-     - 8800
-     - 8800
-     - Planned for Phase 2
-
-.. _client-hub-arch-volumes:
-
-**********************************************************************
-Data Volumes
-**********************************************************************
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 35 40
-
-   * - Volume
-     - Host Path
-     - Purpose
-   * - db-data
-     - ``./data/mariadb/``
-     - MariaDB data directory (git-ignored)
-   * - db-init
-     - ``./init/``
-     - SQL initialization scripts (committed)
-   * - db-backups
-     - ``./backups/``
-     - Database backup files (git-ignored)
+     - REST API wrapper
 
 .. _client-hub-arch-network:
 
@@ -94,20 +71,49 @@ Data Volumes
 Network Architecture
 **********************************************************************
 
-All containers run on the ``client-hub-net`` Docker bridge network.
-The MariaDB port (3307) is exposed to the host for direct access
-during development. In production, only the API container port (8800)
-should be exposed externally.
+The API container (Phase 2) will join ``my-main-net`` to reach the
+shared MariaDB instance via Docker DNS (``mariadb:3306``).
 
 .. code-block:: text
 
-   Host Network (10.0.1.220)
+   Shared Network: my-main-net
    │
-   ├── :3307 ──► client-hub-db (MariaDB)
-   │                    ▲
-   │                    │ internal network
-   │                    │ (client-hub-net)
-   └── :8800 ──► client-hub-api (REST API)
+   ├── mariadb:3306 (~/docker/mariadb/)
+   │       ▲
+   │       │ SQL queries
+   │       │
+   ├── client-hub-api:8800 (Phase 2)
+   │       ▲
+   │       │ REST / Webhooks
+   │
+   └── mysql-mcp-server:8080 (~/docker/mysql-mcp-server/)
+           ▲
+           │ MCP tools (schema design)
+
+Host access: ``10.0.1.220:3306`` for direct MariaDB connections.
+
+.. _client-hub-arch-database:
+
+**********************************************************************
+Database Configuration
+**********************************************************************
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Setting
+     - Value
+   * - Database name
+     - ``clienthub_db``
+   * - Application user
+     - ``clienthub``
+   * - Docker DNS host
+     - ``mariadb``
+   * - Port
+     - ``3306``
+   * - Host access
+     - ``10.0.1.220:3306``
 
 .. _client-hub-arch-env:
 
@@ -125,16 +131,10 @@ templated in ``.env.example`` (committed).
    * - Variable
      - Required
      - Description
-   * - ``MARIADB_ROOT_PASSWORD``
-     - Yes
-     - Root password for MariaDB
-   * - ``MARIADB_DATABASE``
-     - No
-     - Database name (default: ``clienthub_db``)
-   * - ``MARIADB_USER``
+   * - ``DB_USER``
      - No
      - Application user (default: ``clienthub``)
-   * - ``MARIADB_PASSWORD``
+   * - ``DB_PASSWORD``
      - Yes
      - Application user password
 

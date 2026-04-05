@@ -1,27 +1,32 @@
-services:
-  client-hub-db:
-    image: mariadb:11
-    container_name: client-hub-db
-    restart: unless-stopped
-    ports:
-      - "3307:3306"
-    environment:
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
-      MARIADB_DATABASE: ${MARIADB_DATABASE:-clienthub_db}
-      MARIADB_USER: ${MARIADB_USER:-clienthub}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
-    volumes:
-      - ./data/mariadb:/var/lib/mysql
-      - ./init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      start_period: 30s
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    networks:
-      - client-hub-net
+## Client Hub — Docker Compose
+##
+## Database: Uses the shared MariaDB instance at ~/docker/mariadb/
+##   - Docker DNS: mariadb:3306 (via my-main-net)
+##   - Host access: 10.0.1.220:3306
+##   - Database name: clienthub_db
+##
+## This compose file will hold the API layer (Phase 2).
+## For now it defines only the network dependency.
+
+services: {}
+
+## Placeholder for Phase 2:
+#  client-hub-api:
+#    build: ./api
+#    container_name: client-hub-api
+#    restart: unless-stopped
+#    ports:
+#      - "8800:8800"
+#    environment:
+#      DB_HOST: mariadb
+#      DB_PORT: 3306
+#      DB_NAME: clienthub_db
+#      DB_USER: ${DB_USER:-clienthub}
+#      DB_PASSWORD: ${DB_PASSWORD}
+#    networks:
+#      - my-main-net
+#    depends_on: []
 
 networks:
-  client-hub-net:
-    name: client-hub-net
+  my-main-net:
+    external: true
