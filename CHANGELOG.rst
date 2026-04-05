@@ -4,6 +4,19 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-05g:
+
+2026-04-05 — Phase 5: API Server Live with 30 TDD Tests
+======================================================================
+
+- FastAPI server running in Docker on port 8800 (my-main-net)
+- 30 tests passing across 6 test files (TDD, real DB)
+- Implemented endpoints: health, phone/email lookup, contacts CRUD,
+  conversion, marketing opt-outs, preferences, contact summary
+- API key auth on all protected routes
+- OpenAPI spec available at /openapi.json, Swagger at /docs
+- Docker image built and container running as client-hub-api
+
 .. _client-hub-changelog-2026-04-05f:
 
 2026-04-05 — TDD Strategy and SDK Generation Plan

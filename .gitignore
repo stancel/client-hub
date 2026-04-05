@@ -5,3 +5,9 @@ data/
 backups/
 *.sql.gz
 .env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+api/.env
+api/.venv/

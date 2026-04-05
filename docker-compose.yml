@@ -1,31 +1,23 @@
-## Client Hub — Docker Compose
-##
-## Database: Uses the shared MariaDB instance at ~/docker/mariadb/
-##   - Docker DNS: mariadb:3306 (via my-main-net)
-##   - Host access: 10.0.1.220:3306
-##   - Database name: clienthub_db
-##
-## This compose file will hold the API layer (Phase 2).
-## For now it defines only the network dependency.
-
-services: {}
-
-## Placeholder for Phase 2:
-#  client-hub-api:
-#    build: ./api
-#    container_name: client-hub-api
-#    restart: unless-stopped
-#    ports:
-#      - "8800:8800"
-#    environment:
-#      DB_HOST: mariadb
-#      DB_PORT: 3306
-#      DB_NAME: clienthub_db
-#      DB_USER: ${DB_USER:-clienthub}
-#      DB_PASSWORD: ${DB_PASSWORD}
-#    networks:
-#      - my-main-net
-#    depends_on: []
+services:
+  client-hub-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: client-hub-api
+    restart: unless-stopped
+    ports:
+      - "8800:8800"
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-dev_schema}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD}
+      API_KEY: ${API_KEY:-dev-api-key}
+      API_HOST: 0.0.0.0
+      API_PORT: 8800
+    networks:
+      - my-main-net
 
 networks:
   my-main-net:
