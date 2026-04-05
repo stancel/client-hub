@@ -154,8 +154,8 @@ The database schema follows these principles:
    dependencies. Denormalization only at the API/view layer if needed
    for performance.
 
-3. **Multi-tenant** — Every record is scoped to a business/tenant.
-   Row-level isolation from day one.
+3. **Single-tenant** — One database per business deployment.
+   Not multi-tenant in a single database.
 
 4. **Audit trail** — All tables include ``created_at``,
    ``updated_at``, and ``created_by`` columns.

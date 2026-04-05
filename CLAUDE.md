@@ -19,7 +19,7 @@ Client Hub does **not** run its own database container. It uses the shared Maria
 | MariaDB version | 12.2.2 |
 | Docker DNS | `mariadb:3306` (via `my-main-net`) |
 | Host access | `10.0.1.220:3306` |
-| Database name | `clienthub_db` |
+| Database name | `dev_schema` (development) |
 | MCP tools | `apisix-mysql` (`execute_sql`, `search_objects`) via `~/docker/mysql-mcp-server/` |
 
 ### Schema Design Workflow
@@ -113,6 +113,7 @@ docker system df -v 2>&1 | grep mariadb
 
 - **Business-agnostic:** No business-specific columns; use configurable metadata patterns
 - **Third Normal Form (3NF):** Fully normalized, no transitive dependencies
-- **Multi-tenant ready:** Business/tenant isolation from day one
+- **Single-tenant:** One database per business — NOT multi-tenant in a single DB
 - **Audit trail:** Track all changes with created_at/updated_at/created_by
 - **Soft deletes:** Use is_active/deleted_at rather than hard deletes
+- **Data provenance:** Track enriched vs. manually entered fields, source, last verified
