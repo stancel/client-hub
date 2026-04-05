@@ -4,6 +4,23 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-05e:
+
+2026-04-05 — Data-First Reframing and Schema Enhancements
+======================================================================
+
+- Reframed project as **data-first customer intelligence microservice**
+- Added ``marketing_opt_out_sms/email/phone`` boolean flags to contacts
+- Added ``contact_preferences`` table (flexible key-value per contact)
+- Created ``v_contact_summary`` view (holistic intelligence: lifetime
+  value, order stats, communications, opt-outs, tags, sources)
+- Created ``v_contact_last_order`` view (last order details per contact)
+- Updated API design with preference, marketing, and intelligence
+  endpoints
+- Updated all docs (CLAUDE.md, data-model.rst, api-design.rst) to
+  reflect data-first approach and new schema objects
+- Schema now: 31 tables + 2 views (was 30 tables)
+
 .. _client-hub-changelog-2026-04-05d:
 
 2026-04-05 — Phase 3 Complete: Test Data and Validation

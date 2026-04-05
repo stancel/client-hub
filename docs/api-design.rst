@@ -10,9 +10,16 @@ Client Hub — REST API Design
 Overview
 **********************************************************************
 
-The Client Hub API is a RESTful wrapper around the MariaDB database,
-providing the sole integration surface for external systems. No
-external program should access the database directly.
+The Client Hub API is a RESTful convenience layer around the MariaDB
+database. This project follows a **data-first approach**: the database
+schema is the primary product. Both DB-level integration (direct SQL
+from other containers on ``my-main-net``) and API-level integration
+are valid patterns depending on the task.
+
+The API provides structured access for external systems that need
+HTTP endpoints (webhooks, CTI, chatbots), while the database views
+(``v_contact_summary``, ``v_contact_last_order``) provide the same
+intelligence directly via SQL for internal tools and MCP access.
 
 **Framework:** Python FastAPI
 
@@ -286,6 +293,54 @@ Orders CRUD
 - ``POST /api/v1/orders/{uuid}/status`` — Change order status
   (creates history record)
 - ``DELETE /api/v1/orders/{uuid}`` — Soft-delete
+
+.. _client-hub-api-preferences:
+
+Contact Preferences
+======================================================================
+
+- ``GET /api/v1/contacts/{uuid}/preferences`` — List all preferences
+- ``GET /api/v1/contacts/{uuid}/preferences/{key}`` — Get one
+- ``PUT /api/v1/contacts/{uuid}/preferences/{key}`` — Set/update
+- ``DELETE /api/v1/contacts/{uuid}/preferences/{key}`` — Remove
+
+.. _client-hub-api-marketing:
+
+Marketing Opt-Outs
+======================================================================
+
+- ``GET /api/v1/contacts/{uuid}/marketing`` — Get opt-out flags
+- ``PUT /api/v1/contacts/{uuid}/marketing`` — Update opt-out flags
+
+**Request body:**
+
+.. code-block:: json
+
+   {
+     "opt_out_sms": true,
+     "opt_out_email": false,
+     "opt_out_phone": true
+   }
+
+.. _client-hub-api-intelligence:
+
+Customer Intelligence
+======================================================================
+
+These endpoints surface the same data as the database views
+(``v_contact_summary``, ``v_contact_last_order``) through the API.
+
+- ``GET /api/v1/contacts/{uuid}/summary`` — Full intelligence
+  summary (lifetime value, order stats, communication stats,
+  marketing sources, tags, opt-outs, outstanding balance)
+- ``GET /api/v1/contacts/{uuid}/last-order`` — Last order details
+  (order number, date, status, total, item types/descriptions)
+- ``GET /api/v1/intelligence/marketable`` — List contacts who have
+  NOT opted out of a given channel. Query param: ``channel=sms|email|phone``
+- ``GET /api/v1/intelligence/needs-enrichment`` — Contacts with
+  ``enrichment_status`` = ``partial`` or ``needs_review``
+- ``GET /api/v1/intelligence/outstanding-balances`` — Contacts with
+  unpaid invoice balances
 
 .. _client-hub-api-invoices:
 

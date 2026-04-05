@@ -2,12 +2,26 @@
 
 ## Project Overview
 
-**Client Hub** is a centralized, business-agnostic database serving as a single source of truth for client data, prospect data, orders/bookings, marketing channels, and communication preferences. It includes a wrapper REST API layer that external programs (Chatwoot, InvoiceNinja, CTI systems, chatbots) use to read and write data.
+**Client Hub** is a **data-first customer intelligence microservice** — a centralized, business-agnostic MariaDB data store that compiles and enriches information from disparate systems (invoicing, marketing, telephony, chat, support, scheduling, web scraping) into a single source of truth. The database schema is the primary product; the REST API is a convenience layer. Both DB-level and API-level integration are valid patterns.
 
 - **App location:** `~/docker/client-hub/`
 - **Local URL:** http://10.0.1.220:8800 (API — not yet active)
 - **Public URL:** None (will be exposed after API layer is complete)
-- **Current status:** Phase 1 — Data model design
+- **Current status:** Phase 4 — API design (schema complete in dev_schema)
+- **Schema:** 31 tables + 2 views in `dev_schema`
+
+### Data Sources That Feed Into Client Hub
+
+| System | What It Provides |
+|---|---|
+| InvoiceNinja | Invoicing, payments, contact updates |
+| Chatwoot | SMS/MMS, web chat, messaging |
+| SIP/Phone (CTI) | Call logs, caller ID |
+| Zammad | Support tickets, interactions |
+| Marketing platforms | Leads, campaign attribution |
+| Scheduling forms | Bookings, appointments |
+| Web scraping / APIs | Data enrichment, verification |
+| Manual entry | Staff input |
 
 ## Database Infrastructure
 
@@ -111,9 +125,17 @@ docker system df -v 2>&1 | grep mariadb
 
 ## Data Model Design Principles
 
+- **Data-first:** The schema is the product. Design DDL first, API second.
 - **Business-agnostic:** No business-specific columns; use configurable metadata patterns
 - **Third Normal Form (3NF):** Fully normalized, no transitive dependencies
 - **Single-tenant:** One database per business — NOT multi-tenant in a single DB
 - **Audit trail:** Track all changes with created_at/updated_at/created_by
 - **Soft deletes:** Use is_active/deleted_at rather than hard deletes
 - **Data provenance:** Track enriched vs. manually entered fields, source, last verified
+- **Explicit opt-out flags:** Boolean 1/0 for marketing opt-outs (SMS, email, phone)
+- **DB-level intelligence:** Views (`v_contact_summary`, `v_contact_last_order`) available via SQL
+
+## Key Database Views
+
+- `v_contact_summary` — Holistic intelligence: lifetime value, order stats, communication stats, marketing sources, tags, opt-outs, outstanding balance
+- `v_contact_last_order` — Last order details per contact: order number, date, status, total, item types

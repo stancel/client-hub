@@ -354,6 +354,18 @@ type (client, prospect, lead, vendor) is determined by
      - ENUM('complete','partial','needs_review')
      - NO
      - DEFAULT 'partial'
+   * - marketing_opt_out_sms
+     - BOOLEAN
+     - NO
+     - DEFAULT FALSE. 1 = opted out of SMS/MMS marketing.
+   * - marketing_opt_out_email
+     - BOOLEAN
+     - NO
+     - DEFAULT FALSE. 1 = opted out of email marketing.
+   * - marketing_opt_out_phone
+     - BOOLEAN
+     - NO
+     - DEFAULT FALSE. 1 = opted out of phone call marketing.
    * - notes_text
      - TEXT
      - YES
@@ -1050,6 +1062,95 @@ Detailed notes attached to a contact, with authorship tracking.
      - NO
      - DEFAULT CURRENT_TIMESTAMP ON UPDATE
 
+.. _client-hub-dm-contact-preferences:
+
+contact_preferences
+======================================================================
+
+Flexible key-value preferences per contact. Stores arbitrary
+preferences that don't warrant their own column: preferred contact
+time, language, loyalty discount, referral codes, etc.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 10 45
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - id
+     - BIGINT UNSIGNED AUTO_INCREMENT
+     - NO
+     - PK
+   * - contact_id
+     - BIGINT UNSIGNED
+     - NO
+     - FK → contacts.id ON DELETE CASCADE
+   * - pref_key
+     - VARCHAR(100)
+     - NO
+     - Machine-readable key (e.g., "preferred_contact_time")
+   * - pref_value
+     - TEXT
+     - NO
+     - Value as string
+   * - data_source
+     - VARCHAR(50)
+     - YES
+     - Which system set this preference
+   * - created_at
+     - DATETIME
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP
+   * - updated_at
+     - DATETIME
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP ON UPDATE
+
+**Constraints:**
+
+- UNIQUE on ``(contact_id, pref_key)`` — one value per key per contact.
+
+.. _client-hub-dm-views:
+
+**********************************************************************
+Database Views (Data-First)
+**********************************************************************
+
+These views are available at the database level for direct SQL access.
+They provide the same intelligence as the API endpoints but without
+requiring the API to be running.
+
+.. _client-hub-dm-view-last-order:
+
+v_contact_last_order
+======================================================================
+
+Returns one row per contact with their most recent order details:
+order number, date, status, total, item types, and item descriptions.
+
+Contacts with no orders are excluded (use LEFT JOIN if you need all).
+
+.. _client-hub-dm-view-summary:
+
+v_contact_summary
+======================================================================
+
+Comprehensive intelligence view — one row per contact with:
+
+- Identity: name, type, organization, enrichment status
+- Marketing flags: opt-out booleans for SMS, email, phone
+- Primary contact details: phone number, email address
+- Order stats: total orders, lifetime value, last order date
+- Communication stats: total interactions, last communication date
+- Financial: outstanding balance across all invoices
+- Attribution: marketing sources (comma-separated)
+- Classification: tags (comma-separated)
+
+This is the "holistic view" referenced in the project vision. Use it
+for customer analysis, marketing intelligence, and integration lookups.
+
 .. _client-hub-dm-orders:
 
 orders
@@ -1577,10 +1678,10 @@ All tables satisfy Third Normal Form (3NF):
 Complete Table List
 **********************************************************************
 
-**Entity tables (17):**
+**Entity tables (18):**
 
 1. business_settings
-2. contacts
+2. contacts (includes marketing_opt_out_sms/email/phone flags)
 3. organizations
 4. contact_phones
 5. contact_emails
@@ -1589,31 +1690,38 @@ Complete Table List
 8. org_emails
 9. org_addresses
 10. contact_channel_prefs
-11. contact_notes
-12. orders
-13. order_items
-14. order_status_history
-15. invoices
-16. payments
-17. communications
+11. contact_preferences (flexible key-value per contact)
+12. contact_notes
+13. orders
+14. order_items
+15. order_status_history
+16. invoices
+17. payments
+18. communications
 
 **Junction tables (2):**
 
-18. contact_tag_map
-19. contact_marketing_sources
+19. contact_tag_map
+20. contact_marketing_sources
 
 **Lookup tables (11):**
 
-20. contact_types
-21. phone_types
-22. email_types
-23. address_types
-24. channel_types
-25. marketing_sources
-26. order_statuses
-27. order_item_types
-28. invoice_statuses
-29. payment_methods
-30. tags
+21. contact_types
+22. phone_types
+23. email_types
+24. address_types
+25. channel_types
+26. marketing_sources
+27. order_statuses
+28. order_item_types
+29. invoice_statuses
+30. payment_methods
+31. tags
 
-**Total: 30 tables**
+**Views (2):**
+
+32. v_contact_last_order — last order details per contact
+33. v_contact_summary — holistic intelligence view (lifetime value,
+    order stats, communication stats, opt-outs, tags, sources)
+
+**Total: 31 tables + 2 views**
