@@ -4,6 +4,22 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-05h:
+
+2026-04-05 — All API Endpoints Complete: 63 Tests, 23 Paths
+======================================================================
+
+- Implemented remaining routers: organizations, orders, invoices,
+  payments, communications, webhooks (InvoiceNinja + Chatwoot),
+  business settings
+- 63 tests passing across 13 test files in 0.76 seconds
+- 23 endpoint paths live on port 8800
+- Full order lifecycle: create → add items → change status → invoice
+  → record payments (auto-updates balance and status)
+- Webhook handlers: InvoiceNinja payment sync, Chatwoot message
+  identification and communication logging
+- Container rebuilt and verified with curl
+
 .. _client-hub-changelog-2026-04-05g:
 
 2026-04-05 — Phase 5: API Server Live with 30 TDD Tests
