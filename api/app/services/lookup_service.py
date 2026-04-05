@@ -2,15 +2,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.communication import Communication
 from app.models.contact import (
     Contact,
     ContactChannelPref,
     ContactEmail,
-    ContactMarketingSource,
     ContactPhone,
     ContactTagMap,
 )
-from app.models.communication import Communication
 from app.models.order import Order
 
 
@@ -126,8 +125,6 @@ async def _build_match_results(
         phone_info = None
         if phone_map and c.id in phone_map:
             p = phone_map[c.id]
-            phone_type_stmt = select(Contact).where(Contact.id == c.id)  # placeholder
-            # Load phone type
             from app.models.lookups import PhoneType
             pt_result = await db.execute(select(PhoneType).where(PhoneType.id == p.phone_type_id))
             pt = pt_result.scalar_one_or_none()

@@ -3,11 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import require_api_key
+from app.models.contact import ContactPreference
 from app.schemas.contact import (
     ContactCreate,
     ContactUpdate,
     MarketingOptOuts,
-    PreferenceOut,
     PreferenceSet,
 )
 from app.services.contact_service import (
@@ -17,7 +17,6 @@ from app.services.contact_service import (
     get_contact_summary,
     list_contacts,
 )
-from app.models.contact import ContactPreference
 
 router = APIRouter(prefix="/contacts", tags=["contacts"], dependencies=[Depends(require_api_key)])
 
@@ -73,7 +72,10 @@ async def get_contact_endpoint(uuid: str, db: AsyncSession = Depends(get_db)):
             for cp in contact.channel_prefs
         },
         "preferences": {p.pref_key: p.pref_value for p in contact.preferences},
-        "notes": [{"text": n.note_text, "created_by": n.created_by, "created_at": n.created_at.isoformat()} for n in contact.notes],
+        "notes": [
+            {"text": n.note_text, "created_by": n.created_by, "created_at": n.created_at.isoformat()}
+            for n in contact.notes
+        ],
         "is_active": contact.is_active,
         "created_at": contact.created_at.isoformat() if contact.created_at else None,
     }

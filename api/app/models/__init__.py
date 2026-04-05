@@ -1,29 +1,32 @@
-from app.models.lookups import (
-    AddressType,
-    ChannelType,
-    ContactType,
-    EmailType,
-    InvoiceStatus,
-    MarketingSource,
-    OrderItemType,
-    OrderStatus,
-    PaymentMethod,
-    PhoneType,
-    Tag,
-)
-from app.models.organization import Organization, OrgAddress, OrgEmail, OrgPhone
-from app.models.contact import (
-    Contact,
-    ContactAddress,
-    ContactChannelPref,
-    ContactEmail,
-    ContactMarketingSource,
-    ContactNote,
-    ContactPhone,
-    ContactPreference,
-    ContactTagMap,
-)
-from app.models.order import Order, OrderItem, OrderStatusHistory
-from app.models.invoice import Invoice, Payment
-from app.models.communication import Communication
-from app.models.business import BusinessSettings
+# Re-export all models for convenience
+from app.models.business import BusinessSettings as BusinessSettings
+from app.models.communication import Communication as Communication
+from app.models.contact import Contact as Contact
+from app.models.contact import ContactAddress as ContactAddress
+from app.models.contact import ContactChannelPref as ContactChannelPref
+from app.models.contact import ContactEmail as ContactEmail
+from app.models.contact import ContactMarketingSource as ContactMarketingSource
+from app.models.contact import ContactNote as ContactNote
+from app.models.contact import ContactPhone as ContactPhone
+from app.models.contact import ContactPreference as ContactPreference
+from app.models.contact import ContactTagMap as ContactTagMap
+from app.models.invoice import Invoice as Invoice
+from app.models.invoice import Payment as Payment
+from app.models.lookups import AddressType as AddressType
+from app.models.lookups import ChannelType as ChannelType
+from app.models.lookups import ContactType as ContactType
+from app.models.lookups import EmailType as EmailType
+from app.models.lookups import InvoiceStatus as InvoiceStatus
+from app.models.lookups import MarketingSource as MarketingSource
+from app.models.lookups import OrderItemType as OrderItemType
+from app.models.lookups import OrderStatus as OrderStatus
+from app.models.lookups import PaymentMethod as PaymentMethod
+from app.models.lookups import PhoneType as PhoneType
+from app.models.lookups import Tag as Tag
+from app.models.order import Order as Order
+from app.models.order import OrderItem as OrderItem
+from app.models.order import OrderStatusHistory as OrderStatusHistory
+from app.models.organization import OrgAddress as OrgAddress
+from app.models.organization import Organization as Organization
+from app.models.organization import OrgEmail as OrgEmail
+from app.models.organization import OrgPhone as OrgPhone

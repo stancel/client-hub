@@ -40,7 +40,9 @@ class Contact(Base):
     emails: Mapped[list["ContactEmail"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
     addresses: Mapped[list["ContactAddress"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
     channel_prefs: Mapped[list["ContactChannelPref"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
-    marketing_sources: Mapped[list["ContactMarketingSource"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
+    marketing_sources: Mapped[list["ContactMarketingSource"]] = relationship(
+        back_populates="contact", cascade="all, delete-orphan"
+    )
     tags: Mapped[list["ContactTagMap"]] = relationship(cascade="all, delete-orphan")
     notes: Mapped[list["ContactNote"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
     preferences: Mapped[list["ContactPreference"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
@@ -182,7 +184,12 @@ class ContactPreference(Base):
 
 
 from app.models.lookups import (  # noqa: E402
-    AddressType, ChannelType, ContactType, EmailType,
-    MarketingSource, PhoneType, Tag,
+    AddressType,
+    ChannelType,
+    ContactType,
+    EmailType,
+    MarketingSource,
+    PhoneType,
+    Tag,
 )
 from app.models.organization import Organization  # noqa: E402

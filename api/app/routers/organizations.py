@@ -9,8 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.middleware.auth import require_api_key
-from app.models.organization import OrgAddress, OrgEmail, OrgPhone, Organization
-from app.models.lookups import AddressType, EmailType, PhoneType
+from app.models.organization import OrgAddress, Organization, OrgEmail, OrgPhone
 
 router = APIRouter(prefix="/organizations", tags=["organizations"], dependencies=[Depends(require_api_key)])
 

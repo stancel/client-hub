@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import require_api_key
-from app.models.contact import Contact, ContactEmail, ContactPhone
 from app.models.communication import Communication
+from app.models.contact import Contact, ContactEmail, ContactPhone
 from app.models.invoice import Invoice, Payment
 from app.models.lookups import ChannelType, InvoiceStatus, PaymentMethod
 
@@ -51,7 +51,6 @@ async def invoiceninja_webhook(request: Request, db: AsyncSession = Depends(get_
         # Update contact info by external ref
         ninja_client_id = data.get("client_id")
         if ninja_client_id:
-            from sqlalchemy import cast, String
             contacts = (await db.execute(
                 select(Contact).where(Contact.external_refs_json.like(f'%{ninja_client_id}%'))
             )).scalars().all()

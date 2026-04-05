@@ -5,19 +5,18 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.communication import Communication
 from app.models.contact import (
     Contact,
     ContactChannelPref,
     ContactEmail,
     ContactMarketingSource,
     ContactPhone,
-    ContactPreference,
     ContactTagMap,
 )
-from app.models.lookups import ContactType, MarketingSource, PhoneType, EmailType
-from app.models.order import Order
 from app.models.invoice import Invoice
-from app.models.communication import Communication
+from app.models.lookups import ContactType, EmailType, MarketingSource, PhoneType
+from app.models.order import Order
 
 
 async def list_contacts(

@@ -1,0 +1,6 @@
+line-length = 130
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E712"]  # Allow == True/False comparisons for SQLAlchemy filters

@@ -10,8 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.middleware.auth import require_api_key
 from app.models.invoice import Invoice, Payment
-from app.models.order import Order
 from app.models.lookups import InvoiceStatus, PaymentMethod
+from app.models.order import Order
 
 router = APIRouter(prefix="/invoices", tags=["invoices"], dependencies=[Depends(require_api_key)])
 

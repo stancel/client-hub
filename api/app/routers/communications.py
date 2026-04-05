@@ -10,8 +10,8 @@ from app.database import get_db
 from app.middleware.auth import require_api_key
 from app.models.communication import Communication
 from app.models.contact import Contact
-from app.models.order import Order
 from app.models.lookups import ChannelType
+from app.models.order import Order
 
 router = APIRouter(prefix="/communications", tags=["communications"], dependencies=[Depends(require_api_key)])
 

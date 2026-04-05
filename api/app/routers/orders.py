@@ -10,8 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.middleware.auth import require_api_key
-from app.models.order import Order, OrderItem, OrderStatusHistory
 from app.models.lookups import OrderItemType, OrderStatus
+from app.models.order import Order, OrderItem, OrderStatusHistory
 
 router = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(require_api_key)])
 
