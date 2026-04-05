@@ -517,9 +517,130 @@ API Project Structure
    │   └── middleware/
    │       ├── __init__.py
    │       └── auth.py          # API key validation
-   └── tests/
+   └── tests/                    # TDD: every endpoint has a test
        ├── __init__.py
-       ├── conftest.py
+       ├── conftest.py            # Shared fixtures, DB session, test API key
+       ├── test_health.py
        ├── test_lookup.py
        ├── test_contacts.py
-       └── test_webhooks.py
+       ├── test_contacts_convert.py
+       ├── test_contacts_preferences.py
+       ├── test_contacts_marketing.py
+       ├── test_organizations.py
+       ├── test_orders.py
+       ├── test_invoices.py
+       ├── test_payments.py
+       ├── test_communications.py
+       ├── test_webhooks_invoiceninja.py
+       ├── test_webhooks_chatwoot.py
+       ├── test_intelligence.py
+       └── test_settings.py
+
+.. _client-hub-api-testing:
+
+**********************************************************************
+Testing Strategy (TDD)
+**********************************************************************
+
+This project follows **Test Driven Development**. Every API endpoint
+must have a corresponding test written before or alongside the
+implementation. No endpoint ships without tests.
+
+Test framework and tools:
+
+- **pytest** — Test runner
+- **httpx** / **TestClient** — FastAPI's built-in async test client
+- **Real database** — Tests run against ``dev_schema``, not mocks.
+  A test transaction is opened and rolled back after each test to
+  avoid polluting data.
+
+Test categories:
+
+1. **Endpoint tests** — One test file per router module. Tests both
+   success paths (200, 201, 204) and error paths (400, 404, 422).
+2. **Integration tests** — Exercise multi-step flows: create contact
+   → create order → create invoice → record payment → verify summary.
+3. **Webhook tests** — Simulate InvoiceNinja and Chatwoot payloads,
+   verify the correct records are created/updated.
+4. **Lookup tests** — CTI phone lookup, Chatwoot email lookup with
+   exact and partial matching.
+
+Running tests:
+
+.. code-block:: bash
+
+   # Run all tests
+   cd ~/docker/client-hub/api && pytest -v
+
+   # Run a specific test file
+   pytest tests/test_lookup.py -v
+
+   # Run with coverage
+   pytest --cov=app --cov-report=term-missing
+
+Test naming convention:
+
+- ``test_{endpoint}_{scenario}`` — e.g., ``test_lookup_phone_found``,
+  ``test_lookup_phone_not_found``, ``test_create_contact_missing_name``
+
+.. _client-hub-api-sdk:
+
+**********************************************************************
+SDK Generation
+**********************************************************************
+
+Client SDKs are auto-generated from the OpenAPI specification that
+FastAPI produces automatically at ``/openapi.json``. This ensures
+SDKs always match the current API contract.
+
+Target languages:
+
+- **Python** — Primary SDK for internal tools, scripts, data pipelines
+- **PHP** — For web application integrations (WordPress, Laravel, etc.)
+- **TypeScript** — For frontend apps, Node.js services, chatbot integrations
+
+Generator tool: `openapi-generator-cli <https://openapi-generator.tech/>`_
+
+.. code-block:: bash
+
+   # Install (Docker-based, no local Java needed)
+   # Uses the openapitools/openapi-generator-cli Docker image
+
+   # Generate all SDKs
+   ./scripts/generate-sdks.sh
+
+   # Or generate a specific language
+   ./scripts/generate-sdks.sh python
+   ./scripts/generate-sdks.sh php
+   ./scripts/generate-sdks.sh typescript
+
+SDK generation script (``scripts/generate-sdks.sh``):
+
+1. Fetch ``/openapi.json`` from the running API (or read from file)
+2. Run openapi-generator-cli for each target language
+3. Output to ``sdks/{language}/`` directory
+4. Each SDK includes generated client, models, and a README
+
+.. code-block:: text
+
+   sdks/
+   ├── python/
+   │   ├── clienthub/            # Generated Python package
+   │   ├── setup.py
+   │   └── README.md
+   ├── php/
+   │   ├── lib/                  # Generated PHP library
+   │   ├── composer.json
+   │   └── README.md
+   └── typescript/
+       ├── src/                  # Generated TS client
+       ├── package.json
+       └── README.md
+
+Regeneration workflow:
+
+- SDKs should be regenerated whenever the API contract changes
+- The generation script is idempotent — safe to run repeatedly
+- Generated code is committed to the repo so consumers can use it
+  without running the generator themselves
+- Future: integrate into CI/CD pipeline to auto-regenerate on merge

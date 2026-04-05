@@ -4,6 +4,21 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-05f:
+
+2026-04-05 — TDD Strategy and SDK Generation Plan
+======================================================================
+
+- Added TDD testing strategy to API design: every endpoint must have
+  a test written before or alongside it, hitting real DB (not mocks)
+- Added SDK generation section: auto-generate Python, PHP, TypeScript
+  SDKs from OpenAPI spec via ``scripts/generate-sdks.sh``
+- Expanded project structure with full test file listing (one per
+  router module)
+- Updated TODO.rst with Phase 6 (SDK Generation), Phase 7 (CI/CD
+  Pipeline), and expanded Phase 5 with per-endpoint test requirements
+- Added Future section to TODO.rst for planned integrations
+
 .. _client-hub-changelog-2026-04-05e:
 
 2026-04-05 — Data-First Reframing and Schema Enhancements
