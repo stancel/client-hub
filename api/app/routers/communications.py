@@ -7,11 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.middleware.auth import require_api_key
+from app.middleware.auth import SourceContext, require_api_key
 from app.models.communication import Communication
 from app.models.contact import Contact
 from app.models.lookups import ChannelType
 from app.models.order import Order
+from app.models.source import Source
 
 router = APIRouter(prefix="/communications", tags=["communications"], dependencies=[Depends(require_api_key)])
 
@@ -87,7 +88,11 @@ async def get_communication(uuid: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", status_code=201)
-async def create_communication(body: CommCreate, db: AsyncSession = Depends(get_db)):
+async def create_communication(
+    body: CommCreate,
+    ctx: SourceContext = Depends(require_api_key),
+    db: AsyncSession = Depends(get_db),
+):
     contact = (await db.execute(select(Contact).where(Contact.uuid == body.contact_uuid))).scalar_one_or_none()
     if not contact:
         raise HTTPException(status_code=400, detail=f"Contact {body.contact_uuid} not found")
@@ -102,9 +107,16 @@ async def create_communication(body: CommCreate, db: AsyncSession = Depends(get_
         if order:
             order_id = order.id
 
+    # Resolve source_id from auth context
+    source_id = ctx.source_id
+    if source_id is None:
+        bootstrap = (await db.execute(select(Source).where(Source.code == "bootstrap"))).scalar_one()
+        source_id = bootstrap.id
+
     from datetime import datetime
     comm = Communication(
-        uuid=str(uuid_mod.uuid4()), contact_id=contact.id, channel_type_id=channel.id,
+        uuid=str(uuid_mod.uuid4()), source_id=source_id,
+        contact_id=contact.id, channel_type_id=channel.id,
         order_id=order_id, direction=body.direction,
         subject=body.subject, body=body.body,
         occurred_at=datetime.fromisoformat(body.occurred_at),

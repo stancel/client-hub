@@ -89,6 +89,7 @@ async def get_contact_by_uuid(db: AsyncSession, contact_uuid: str) -> Contact | 
         .where(Contact.uuid == contact_uuid)
         .options(
             selectinload(Contact.contact_type),
+            selectinload(Contact.first_seen_source),
             selectinload(Contact.organization),
             selectinload(Contact.phones).selectinload(ContactPhone.phone_type),
             selectinload(Contact.emails).selectinload(ContactEmail.email_type),
@@ -104,16 +105,23 @@ async def get_contact_by_uuid(db: AsyncSession, contact_uuid: str) -> Contact | 
     return result.scalar_one_or_none()
 
 
-async def create_contact(db: AsyncSession, data: dict) -> Contact:
+async def create_contact(db: AsyncSession, data: dict, source_id: int | None = None) -> Contact:
     # Resolve contact type
     ct_result = await db.execute(select(ContactType).where(ContactType.code == data["contact_type"]))
     ct = ct_result.scalar_one_or_none()
     if not ct:
         raise ValueError(f"Unknown contact type: {data['contact_type']}")
 
+    # Resolve source_id — use provided or fall back to bootstrap
+    if source_id is None:
+        from app.models.source import Source
+        bootstrap = (await db.execute(select(Source).where(Source.code == "bootstrap"))).scalar_one()
+        source_id = bootstrap.id
+
     contact = Contact(
         uuid=str(uuid_mod.uuid4()),
         contact_type_id=ct.id,
+        first_seen_source_id=source_id,
         first_name=data["first_name"],
         last_name=data["last_name"],
         display_name=data.get("display_name"),

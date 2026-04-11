@@ -12,6 +12,7 @@ class Contact(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     uuid: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
     contact_type_id: Mapped[int] = mapped_column(ForeignKey("contact_types.id"))
+    first_seen_source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="RESTRICT"))
     organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"))
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -35,6 +36,7 @@ class Contact(Base):
 
     contact_type: Mapped["ContactType"] = relationship(foreign_keys=[contact_type_id])
     converted_from_type: Mapped["ContactType | None"] = relationship(foreign_keys=[converted_from_type_id])
+    first_seen_source: Mapped["Source"] = relationship(foreign_keys=[first_seen_source_id])
     organization: Mapped["Organization | None"] = relationship(back_populates="contacts")
     phones: Mapped[list["ContactPhone"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
     emails: Mapped[list["ContactEmail"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
@@ -193,3 +195,4 @@ from app.models.lookups import (  # noqa: E402
     Tag,
 )
 from app.models.organization import Organization  # noqa: E402
+from app.models.source import Source  # noqa: E402

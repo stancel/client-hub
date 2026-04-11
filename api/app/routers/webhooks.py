@@ -6,11 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.middleware.auth import require_api_key
+from app.middleware.auth import SourceContext, require_api_key
 from app.models.communication import Communication
 from app.models.contact import Contact, ContactEmail, ContactPhone
 from app.models.invoice import Invoice, Payment
 from app.models.lookups import ChannelType, InvoiceStatus, PaymentMethod
+from app.models.source import Source
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"], dependencies=[Depends(require_api_key)])
 
@@ -64,7 +65,11 @@ async def invoiceninja_webhook(request: Request, db: AsyncSession = Depends(get_
 
 
 @router.post("/chatwoot")
-async def chatwoot_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+async def chatwoot_webhook(
+    request: Request,
+    ctx: SourceContext = Depends(require_api_key),
+    db: AsyncSession = Depends(get_db),
+):
     payload = await request.json()
     event = payload.get("event", "unknown")
     data = payload.get("data", {})
@@ -94,8 +99,15 @@ async def chatwoot_webhook(request: Request, db: AsyncSession = Depends(get_db))
             channel = (await db.execute(select(ChannelType).where(ChannelType.code == channel_code))).scalar_one_or_none()
 
             if channel:
+                # Resolve source_id from auth context
+                source_id = ctx.source_id
+                if source_id is None:
+                    bootstrap = (await db.execute(select(Source).where(Source.code == "bootstrap"))).scalar_one()
+                    source_id = bootstrap.id
+
                 comm = Communication(
-                    uuid=str(uuid_mod.uuid4()), contact_id=contact.id, channel_type_id=channel.id,
+                    uuid=str(uuid_mod.uuid4()), source_id=source_id,
+                    contact_id=contact.id, channel_type_id=channel.id,
                     direction="inbound", subject=data.get("content", "")[:255] if data.get("content") else None,
                     body=data.get("content"), occurred_at=datetime.now(timezone.utc),
                     external_message_id=str(data.get("id", "")), created_by="chatwoot",

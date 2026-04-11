@@ -7,7 +7,8 @@ class Settings(BaseSettings):
     db_name: str = "dev_schema"
     db_user: str = "clienthub"
     db_password: str = ""
-    api_key: str = "dev-api-key"
+    api_key: str = "dev-api-key"  # Legacy: kept for backward compat in dev
+    clienthub_root_api_key: str = ""  # Root admin key (bypasses source context)
     api_host: str = "0.0.0.0"
     api_port: int = 8800
 

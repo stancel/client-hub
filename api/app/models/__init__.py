@@ -1,4 +1,5 @@
 # Re-export all models for convenience
+from app.models.api_key import ApiKey as ApiKey
 from app.models.business import BusinessSettings as BusinessSettings
 from app.models.communication import Communication as Communication
 from app.models.contact import Contact as Contact
@@ -27,6 +28,7 @@ from app.models.order import Order as Order
 from app.models.order import OrderItem as OrderItem
 from app.models.order import OrderStatusHistory as OrderStatusHistory
 from app.models.organization import OrgAddress as OrgAddress
-from app.models.organization import Organization as Organization
 from app.models.organization import OrgEmail as OrgEmail
 from app.models.organization import OrgPhone as OrgPhone
+from app.models.organization import Organization as Organization
+from app.models.source import Source as Source

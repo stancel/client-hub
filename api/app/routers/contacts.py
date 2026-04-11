@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.middleware.auth import require_api_key
+from app.middleware.auth import SourceContext, require_api_key
 from app.models.contact import ContactPreference
 from app.schemas.contact import (
     ContactCreate,
@@ -82,9 +82,13 @@ async def get_contact_endpoint(uuid: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", status_code=201)
-async def create_contact_endpoint(body: ContactCreate, db: AsyncSession = Depends(get_db)):
+async def create_contact_endpoint(
+    body: ContactCreate,
+    ctx: SourceContext = Depends(require_api_key),
+    db: AsyncSession = Depends(get_db),
+):
     try:
-        contact = await create_contact(db, body.model_dump())
+        contact = await create_contact(db, body.model_dump(), source_id=ctx.source_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"uuid": contact.uuid, "first_name": contact.first_name, "last_name": contact.last_name}
