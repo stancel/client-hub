@@ -96,11 +96,30 @@ Phase 7 — CI/CD Pipeline [COMPLETE]
 - [x] All RST docs passing rstcheck
 - [x] Documented in ``docs/ci-cd.rst``
 
-.. _client-hub-todo-future:
+.. _client-hub-todo-phase8:
 
-Future — Planned Integrations
+Phase 8 — Multi-Source + Installer [COMPLETE]
 ======================================================================
 
+- [x] Migrations 014-018 (sources, api_keys, source_id columns,
+  channel types, views, tracking table)
+- [x] Multi-source auth middleware (root key + per-source keys)
+- [x] Admin router for sources and API key management
+- [x] Auto-stamp source_id on contacts and communications
+- [x] 78 tests passing (63 original + 15 new)
+- [x] One-line installer (``scripts/install.sh``)
+- [x] Bundled Docker compose files (with/without TLS)
+- [x] Backup, uninstall, smoke-test, migration runner scripts
+- [x] Full documentation: Multi-Source, Deployment, Cross-Project
+  Integration, Data Privacy, Upgrade guide
+- [x] Updated CI workflow with shellcheck + new migrations
+
+.. _client-hub-todo-future:
+
+Future — Planned Work
+======================================================================
+
+- [ ] Deploy first production instance (Complete Dental Care VPS)
 - [ ] InvoiceNinja webhook integration (live)
 - [ ] Chatwoot webhook integration (live)
 - [ ] SIP/Phone CTI integration (live caller lookup)
@@ -109,6 +128,8 @@ Future — Planned Integrations
 - [ ] Scheduling form integration
 - [ ] Web scraping / enrichment API integration
 - [ ] Online booking portal (prospect self-registration)
-- [ ] Expose API via Nginx Proxy Manager with SSL
-- [ ] Automated database backups
+- [x] Expose API via Caddy with auto-TLS (bundled compose)
+- [x] Automated database backups (nightly cron)
 - [ ] Monitoring and alerting
+- [ ] Data retention / PII purge automation
+- [ ] Rate limiting on admin endpoints

@@ -4,6 +4,45 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-11b:
+
+2026-04-11 — Multi-Source Attribution + One-Line Installer
+======================================================================
+
+Major implementation based on Installation-Implementation-Prompt.rst:
+
+**Goal A — One-Line Installer:**
+
+- ``scripts/install.sh`` — Ollama-style ``curl|bash`` for Ubuntu/Debian
+- ``scripts/uninstall.sh``, ``backup.sh``, ``bootstrap-migrations.sh``,
+  ``smoke-test.sh``, ``generate-api-key.sh``
+- ``docker-compose.bundled.yml`` (MariaDB + API + Caddy with auto-TLS)
+- ``docker-compose.bundled-nodomain.yml`` (MariaDB + API, port 8800)
+- ``Caddyfile`` with auto Let's Encrypt
+
+**Goal B — Multi-Source Attribution:**
+
+- Migrations 014-018: ``sources``, ``api_keys`` tables,
+  ``first_seen_source_id`` on contacts, ``source_id`` on
+  communications, cross-project channel_types (10 new Web Factory
+  event codes), ``v_events_by_source`` view, ``_schema_migrations``
+  tracking table
+- New auth middleware: resolves X-API-Key to SourceContext (root key
+  or per-source key)
+- Admin router: CRUD for sources + API keys (root-key-only)
+- Auto-stamps source_id on contact/communication creation
+- Schema now: 34 tables + 3 views
+
+**Goal C — Cross-Project Integration:**
+
+- ``docs/Multi-Source.rst`` — sources vs marketing_sources
+- ``docs/Deployment.rst`` — one-liner install guide
+- ``docs/Cross-Project-Integration.rst`` — reference lib/client-hub.ts
+- ``docs/Data-Privacy.rst`` — PII handling policy
+- ``docs/Upgrade.rst`` — upgrade and key rotation guide
+
+**Tests:** 78 passing (63 original + 15 new) across 16 test files
+
 .. _client-hub-changelog-2026-04-11:
 
 2026-04-11 — Full Documentation Refresh

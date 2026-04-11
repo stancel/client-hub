@@ -28,7 +28,7 @@ from app.models.order import Order as Order
 from app.models.order import OrderItem as OrderItem
 from app.models.order import OrderStatusHistory as OrderStatusHistory
 from app.models.organization import OrgAddress as OrgAddress
+from app.models.organization import Organization as Organization
 from app.models.organization import OrgEmail as OrgEmail
 from app.models.organization import OrgPhone as OrgPhone
-from app.models.organization import Organization as Organization
 from app.models.source import Source as Source

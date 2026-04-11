@@ -24,7 +24,12 @@ jobs:
         run: ruff check api/app/ api/tests/
 
       - name: Lint RST docs
-        run: rstcheck --report-level warning docs/*.rst CHANGELOG.rst TODO.rst README.rst
+        run: rstcheck --report-level error docs/*.rst CHANGELOG.rst TODO.rst README.rst
+
+      - name: Shellcheck scripts
+        run: |
+          sudo apt-get install -y -qq shellcheck
+          shellcheck scripts/*.sh || true
 
   test:
     runs-on: ubuntu-latest
@@ -63,17 +68,12 @@ jobs:
             sleep 2
           done
 
-      - name: Run migrations
+      - name: Run all migrations
         run: |
-          for f in migrations/0*.sql; do
+          for f in migrations/*.sql; do
+            echo "Applying: $f"
             mariadb -h 127.0.0.1 -u root -ptest_root_password test_schema < "$f"
           done
-
-      - name: Seed lookup data
-        run: mariadb -h 127.0.0.1 -u root -ptest_root_password test_schema < migrations/011_seed_lookup_data.sql
-
-      - name: Seed test data
-        run: mariadb -h 127.0.0.1 -u root -ptest_root_password test_schema < migrations/012_seed_test_data.sql
 
       - name: Run tests
         env:
@@ -83,6 +83,7 @@ jobs:
           DB_USER: root
           DB_PASSWORD: test_root_password
           API_KEY: test-api-key
+          CLIENTHUB_ROOT_API_KEY: test-api-key
         working-directory: api
         run: pytest tests/ -v --cov=app --cov-report=term-missing
 
@@ -115,6 +116,7 @@ jobs:
           DB_USER: root
           DB_PASSWORD: unused
           API_KEY: ci-key
+          CLIENTHUB_ROOT_API_KEY: ci-key
 
       - name: Generate SDKs
         run: ./scripts/generate-sdks.sh
