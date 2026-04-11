@@ -1,0 +1,70 @@
+## Client Hub — Bundled Deployment (MariaDB + API + Caddy)
+## Used by scripts/install.sh for VPS deployments with a domain and TLS.
+
+services:
+  mariadb:
+    image: mariadb:12.2
+    container_name: clienthub-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME:-clienthub}
+      MARIADB_USER: ${DB_USER:-clienthub}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      TZ: UTC
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - clienthub
+
+  client-hub-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: clienthub-api
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-clienthub}
+      DB_USER: ${DB_USER:-clienthub}
+      DB_PASSWORD: ${DB_PASSWORD}
+      CLIENTHUB_ROOT_API_KEY: ${CLIENTHUB_ROOT_API_KEY}
+      API_KEY: ${CLIENTHUB_ROOT_API_KEY}
+      API_HOST: 0.0.0.0
+      API_PORT: 8800
+      TZ: UTC
+    networks:
+      - clienthub
+
+  caddy:
+    image: caddy:2
+    container_name: clienthub-caddy
+    restart: unless-stopped
+    depends_on:
+      - client-hub-api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+      - ./data/caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+    networks:
+      - clienthub
+
+networks:
+  clienthub:
+    driver: bridge

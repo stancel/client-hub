@@ -1,0 +1,10 @@
+{$DOMAIN} {
+    encode gzip
+
+    reverse_proxy client-hub-api:8800
+
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
