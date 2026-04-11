@@ -4,6 +4,33 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-11e:
+
+2026-04-11 — Document external_refs_json Payload Contract
+======================================================================
+
+Documentation-only follow-up after the external_refs_json fix was
+verified on the live dental care VPS. The server-side round-trip
+proved the fix works, but surfaced that the dental care caller is
+sending a thin payload and that ``booking.cancelled`` overwrites
+``booking.created``.
+
+- ``docs/Cross-Project-Integration.rst`` — added new section
+  "external_refs_json Payload Contract" with the canonical JSON
+  shape, a "don't shadow — merge" rule for scheduler update
+  hooks, and a checklist new Web Factory sites (Clever Orchid,
+  etc.) must satisfy before going live.
+- ``docs/Dental-Care-Payload-Fix-Prompt.rst`` — new handoff prompt
+  for the dental care Next.js session, covering: capturing
+  request headers in the booking form server action, enriching
+  ``extra`` with scheduler event details, fixing the
+  ``booking.cancelled`` overwrite by appending a communication
+  row instead of re-upserting the contact, and investigating the
+  separate frontdesk cancellation email bug.
+
+No code changes. Client-hub server side is unchanged from
+``fa6bf2d``.
+
 .. _client-hub-changelog-2026-04-11d:
 
 2026-04-11 — Fix external_refs_json Data-Loss Bug

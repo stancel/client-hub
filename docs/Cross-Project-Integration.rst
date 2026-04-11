@@ -226,3 +226,93 @@ Usage Example (Next.js API Route)
 
      return Response.json({ success: true });
    }
+
+.. _client-hub-cp-payload-contract:
+
+**********************************************************************
+external_refs_json Payload Contract
+**********************************************************************
+
+Every integration MUST populate ``external_refs_json`` with as much
+of the following shape as is available on the caller side. The
+fields below are what the reference ``lib/client-hub.ts`` module
+collects; consumers of client-hub (reports, dashboards, Eaglesoft
+sync, etc.) assume these paths.
+
+.. code-block:: text
+
+   {
+     "source_page": "/book",                  # REQUIRED — URL path that fired the event
+     "site_source_code": "my_website",        # REQUIRED — matches CLIENTHUB_SOURCE_CODE
+     "referrer": "https://google.com/...",    # request referer header
+     "ip_address": "203.0.113.42",            # from x-forwarded-for / x-real-ip
+     "user_agent": "Mozilla/5.0 ...",         # from user-agent header
+     "gtm_client_id": "GA1.1.1234.5678",      # GA4/GTM client ID if available
+     "utm": {                                 # UTM parameters from the landing URL
+       "source": "google",
+       "medium": "cpc",
+       "campaign": "summer-2026",
+       "term": "...",
+       "content": "..."
+     },
+     "extra": {                               # event-specific metadata
+       "scheduler_event": "booking.created",  # which hook fired
+       "appointment_id": 6,
+       "service_name": "Filling",
+       "staff_name": "Dr. Smith",
+       "start_date": "2026-04-20T10:00:00Z",
+       "total_price": "150.00"
+     }
+   }
+
+.. rubric:: Mandatory fields
+
+- ``source_page`` — the path/URL the event originated from
+- ``site_source_code`` — used for cross-site reporting and source
+  attribution filters
+- Request headers (``user_agent``, ``ip_address``, ``referrer``)
+  MUST be populated on **every** server-side POST. These are the
+  minimum evidence needed to later investigate fraud, deduplicate
+  leads across sites, and correlate with upstream analytics.
+
+.. rubric:: Don't shadow — merge
+
+Scheduler cancellation / update hooks must NOT POST a thinner
+payload that overwrites the richer one from ``booking.created``.
+When ``booking.cancelled`` fires, either:
+
+1. **Preferred:** append a new ``communication`` row to the
+   existing contact via ``POST /api/v1/communications`` with
+   ``channel_code = booking_cancelled`` and leave the contact
+   row's ``external_refs_json`` alone.
+2. **If the hook legitimately needs to update the contact:** GET
+   the current ``external_refs_json``, deep-merge the new fields
+   in (do NOT replace), then ``PUT /api/v1/contacts/{uuid}``.
+
+The dental care site hit this bug on 2026-04-11 — the
+``booking.cancelled`` hook overwrote a rich ``booking.created``
+payload with a 3-field stub. See
+``docs/Dental-Care-Payload-Fix-Prompt.rst`` for the fix checklist.
+
+.. rubric:: Checklist for new integrations (Clever Orchid, etc.)
+
+Before wiring a new Web Factory site to client-hub, verify the
+following in the site's ``lib/client-hub.ts`` and every caller:
+
+- [ ] ``CLIENTHUB_SOURCE_CODE`` env var set; ``site_source_code``
+  included in every ``external_refs_json``
+- [ ] Every ``logConversion`` / ``logConversionBackground``
+  caller passes ``sourcePage``, ``userAgent``, ``ipAddress``,
+  ``referrer`` (read from ``next/headers`` or equivalent on the
+  server)
+- [ ] UTM parameters parsed from the landing URL and passed
+  through on the first server-side call of the session
+- [ ] Scheduler / booking hooks populate the ``extra`` object with
+  ``scheduler_event``, ``appointment_id``, ``service_name``,
+  ``staff_name``, ``start_date``, ``total_price``
+- [ ] ``booking.cancelled`` / update hooks either append a
+  communication row OR deep-merge ``external_refs_json`` — they do
+  NOT replace
+- [ ] End-to-end smoke test: submit a booking, cancel it, query
+  ``SELECT external_refs_json FROM contacts ORDER BY created_at
+  DESC LIMIT 1`` — every field above should be populated
