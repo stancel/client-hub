@@ -55,6 +55,9 @@ async def _build_match_results(
     phone_map: dict | None = None,
     email_map: dict | None = None,
 ):
+    from app.models.contact import ContactEmail as CEModel
+    from app.models.contact import ContactPhone as CPModel
+
     stmt = (
         select(Contact)
         .where(Contact.id.in_(contact_ids))
@@ -63,6 +66,8 @@ async def _build_match_results(
             selectinload(Contact.organization),
             selectinload(Contact.tags).selectinload(ContactTagMap.tag),
             selectinload(Contact.channel_prefs).selectinload(ContactChannelPref.channel_type),
+            selectinload(Contact.phones).selectinload(CPModel.phone_type),
+            selectinload(Contact.emails).selectinload(CEModel.email_type),
         )
     )
     result = await db.execute(stmt)
@@ -121,32 +126,26 @@ async def _build_match_results(
                 "opt_in": cp.opt_in_status,
             }
 
-        # Build phone/email info from matched row
+        # Include ALL phones and emails (not just the matched one)
+        all_phones = [
+            {"number": p.phone_number, "type": p.phone_type.code, "is_primary": p.is_primary, "is_verified": p.is_verified}
+            for p in c.phones
+        ]
+        all_emails = [
+            {"address": e.email_address, "type": e.email_type.code, "is_primary": e.is_primary, "is_verified": e.is_verified}
+            for e in c.emails
+        ]
+
+        # Matched phone/email for quick reference
         phone_info = None
         if phone_map and c.id in phone_map:
             p = phone_map[c.id]
-            from app.models.lookups import PhoneType
-            pt_result = await db.execute(select(PhoneType).where(PhoneType.id == p.phone_type_id))
-            pt = pt_result.scalar_one_or_none()
-            phone_info = {
-                "number": p.phone_number,
-                "type": pt.code if pt else "unknown",
-                "is_primary": p.is_primary,
-                "is_verified": p.is_verified,
-            }
+            phone_info = {"number": p.phone_number, "type": "phone", "is_primary": p.is_primary, "is_verified": p.is_verified}
 
         email_info = None
         if email_map and c.id in email_map:
             e = email_map[c.id]
-            from app.models.lookups import EmailType
-            et_result = await db.execute(select(EmailType).where(EmailType.id == e.email_type_id))
-            et = et_result.scalar_one_or_none()
-            email_info = {
-                "address": e.email_address,
-                "type": et.code if et else "unknown",
-                "is_primary": e.is_primary,
-                "is_verified": e.is_verified,
-            }
+            email_info = {"address": e.email_address, "type": "email", "is_primary": e.is_primary, "is_verified": e.is_verified}
 
         matches.append({
             "uuid": c.uuid,
@@ -157,6 +156,8 @@ async def _build_match_results(
             "organization": c.organization.name if c.organization else None,
             "phone": phone_info,
             "email": email_info,
+            "phones": all_phones,
+            "emails": all_emails,
             "recent_orders": recent_orders,
             "recent_communications": recent_comms,
             "tags": tags,

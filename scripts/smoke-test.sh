@@ -52,9 +52,9 @@ check "Database is connected" "$([ "$db_status" = "connected" ] && echo pass || 
 spec_code=$(curl -sf -o /dev/null -w "%{http_code}" "$API_URL/openapi.json" 2>/dev/null || echo "000")
 check "GET /openapi.json returns 200" "$([ "$spec_code" = "200" ] && echo pass || echo fail)"
 
-# 4. Auth required on protected endpoints
-unauth_code=$(curl -sf -o /dev/null -w "%{http_code}" "$API_URL/api/v1/contacts" 2>/dev/null || echo "000")
-check "GET /contacts without key returns 401" "$([ "$unauth_code" = "401" ] && echo pass || echo fail)"
+# 4. Auth required on protected endpoints (no -f flag — we need the HTTP code even on 4xx)
+unauth_code=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/v1/contacts" 2>/dev/null || echo "000")
+check "GET /contacts without key returns 401 or 403" "$([ "$unauth_code" = "401" ] || [ "$unauth_code" = "403" ] && echo pass || echo fail)"
 
 # 5. Authenticated access (if API key provided)
 if [[ -n "$API_KEY" ]]; then

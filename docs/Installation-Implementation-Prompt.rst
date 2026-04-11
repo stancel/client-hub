@@ -1592,6 +1592,13 @@ parent Claude Code session in the dental care repo) will:
 8. Deploy via the standard ``git pull + deploy.sh`` workflow
 9. Verify a test form submission lands in ``v_events_by_source``
 10. Repeat for Clever Orchid and every future Web Factory site
+
+
+.. note::
+
+   **Second pass:** See ``docs/Post-Deployment-Fixes-Prompt.rst`` for
+   fixes and improvements discovered during the first real production
+   deployment.
     using the same pattern (each company gets its own client-hub
     instance on its own droplet)
 

@@ -41,11 +41,22 @@ if [[ -d /var/log/client-hub ]]; then
     rm -rf /var/log/client-hub
 fi
 
+SAVED_DIR="/root/client-hub-saved"
+
 if $PURGE; then
     echo "Purging all data including backups..."
     rm -rf "$INSTALL_DIR"
 else
-    echo "Preserving backups at $INSTALL_DIR/backups/"
+    # Preserve credentials and backups
+    echo "Preserving credentials and backups..."
+    mkdir -p "$SAVED_DIR"
+    for f in .env .install-summary; do
+        if [[ -f "$INSTALL_DIR/$f" ]]; then
+            cp -p "$INSTALL_DIR/$f" "$SAVED_DIR/"
+        fi
+    done
+    echo "  Credentials saved to $SAVED_DIR/"
+    echo "  Backups preserved at $INSTALL_DIR/backups/"
     # Remove everything except backups
     find "$INSTALL_DIR" -mindepth 1 -maxdepth 1 ! -name 'backups' -exec rm -rf {} +
 fi

@@ -4,6 +4,32 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-11c:
+
+2026-04-11 — Post-Deployment Fixes and Hardening
+======================================================================
+
+Fixes from first real VPS deployment on
+``client-hub-complete-dental-care.onlinesalessystems.com``:
+
+- **Smoke test fix:** removed ``curl -sf`` (which suppresses 4xx
+  status codes); now accepts 401 or 403 for unauthenticated access
+- **Seed data separation:** moved ``012_seed_test_data.sql`` to
+  ``migrations/dev/``; production installs no longer get test data.
+  Use ``--with-seed-data`` flag for dev/CI. Updated CI workflow.
+- **Cleanup script:** ``scripts/cleanup-test-data.sh`` for removing
+  test data from already-contaminated production instances
+- **Installer hardening:** DNS pre-flight check for TLS domains,
+  ``--include-seed-data`` flag, ``docker-compose.override.yml.example``
+  for OpsInsights access
+- **Uninstall safety:** preserves ``.env`` and ``.install-summary``
+  to ``/root/client-hub-saved/`` before deletion
+- **Lookup fix:** phone and email lookup now return ALL contact
+  phones and emails (not just the matched one)
+- **Admin events endpoint:** ``GET /api/v1/admin/events`` with
+  source_code, channel_code, date range filters (root-key-only)
+- **82 tests passing** (was 78)
+
 .. _client-hub-changelog-2026-04-11b:
 
 2026-04-11 — Multi-Source Attribution + One-Line Installer

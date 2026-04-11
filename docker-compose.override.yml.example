@@ -1,0 +1,15 @@
+# docker-compose.override.yml.example
+#
+# Copy to docker-compose.override.yml (no .example suffix) to
+# enable OpsInsights / local mariadb client access over an SSH tunnel:
+#
+#   ssh -N -L 13306:127.0.0.1:3306 root@client-hub.example.com
+#   mariadb -h 127.0.0.1 -P 13306 -u clienthub -p clienthub
+#
+# WARNING: Only binds to 127.0.0.1 (loopback). Do NOT change to
+# 0.0.0.0 — that would expose the database to the public internet.
+
+# services:
+#   mariadb:
+#     ports:
+#       - "127.0.0.1:3306:3306"

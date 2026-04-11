@@ -114,12 +114,29 @@ Phase 8 — Multi-Source + Installer [COMPLETE]
   Integration, Data Privacy, Upgrade guide
 - [x] Updated CI workflow with shellcheck + new migrations
 
+.. _client-hub-todo-phase9:
+
+Phase 9 — Post-Deployment Fixes [COMPLETE]
+======================================================================
+
+- [x] Smoke test fix (curl -sf → -s, accept 401/403)
+- [x] Seed data separated (migrations/dev/, --with-seed-data flag)
+- [x] Cleanup script for contaminated production instances
+- [x] Installer hardening (DNS preflight, --include-seed-data)
+- [x] Override example for OpsInsights access
+- [x] Uninstall preserves credentials to /root/client-hub-saved/
+- [x] Lookup returns all phones/emails (not just matched)
+- [x] Admin events endpoint (GET /admin/events with filters)
+- [x] 82 tests passing
+
 .. _client-hub-todo-future:
 
 Future — Planned Work
 ======================================================================
 
-- [ ] Deploy first production instance (Complete Dental Care VPS)
+- [x] Deploy first production instance (Complete Dental Care VPS)
+- [ ] Run cleanup-test-data.sh on production VPS
+- [ ] Contact dedup/upsert endpoint (Section 6b — discuss with Brad)
 - [ ] InvoiceNinja webhook integration (live)
 - [ ] Chatwoot webhook integration (live)
 - [ ] SIP/Phone CTI integration (live caller lookup)

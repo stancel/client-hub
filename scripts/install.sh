@@ -27,6 +27,7 @@ ADMIN_EMAIL=""
 FIRST_SOURCE_CODE="bootstrap"
 FIRST_SOURCE_NAME="Bootstrap Source"
 SDK_LANG="none"
+INCLUDE_SEED_DATA=false
 NON_INTERACTIVE=false
 MIN_RAM_MB=1024
 MIN_DISK_GB=10
@@ -42,6 +43,7 @@ while [[ $# -gt 0 ]]; do
         --first-source-code)  FIRST_SOURCE_CODE="$2"; shift 2 ;;
         --first-source-name)  FIRST_SOURCE_NAME="$2"; shift 2 ;;
         --sdks)               SDK_LANG="$2"; shift 2 ;;
+        --include-seed-data)  INCLUDE_SEED_DATA=true; shift ;;
         --non-interactive)    NON_INTERACTIVE=true; shift ;;
         --install-dir)        INSTALL_DIR="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
@@ -119,6 +121,27 @@ if ! $NON_INTERACTIVE; then
     prompt FIRST_SOURCE_NAME "First source display name" "$FIRST_SOURCE_NAME"
     prompt SDK_LANG "SDK languages to generate (all/python/php/typescript/none)" "$SDK_LANG"
     echo ""
+fi
+
+# ============================================================
+# Install prerequisites
+# ============================================================
+# DNS pre-flight check (5b)
+# ============================================================
+if [[ -n "$DOMAIN" ]]; then
+    log "Checking DNS for $DOMAIN..."
+    apt-get install -y -qq dnsutils >/dev/null 2>&1 || true
+    my_ip=$(curl -sf https://api.ipify.org 2>/dev/null || echo "")
+    resolved=$(dig +short A "$DOMAIN" 2>/dev/null | head -1 || echo "")
+    if [[ -n "$my_ip" && -n "$resolved" ]]; then
+        if [[ "$my_ip" != "$resolved" ]]; then
+            warn "Domain $DOMAIN resolves to $resolved but this host is $my_ip. Caddy TLS will likely fail."
+        else
+            log "DNS OK: $DOMAIN -> $my_ip"
+        fi
+    else
+        warn "Could not verify DNS for $DOMAIN — proceeding, but Caddy may fail to get a cert"
+    fi
 fi
 
 # ============================================================
@@ -257,23 +280,31 @@ docker compose -f "$COMPOSE_FILE" exec -T mariadb \
 log "MariaDB is ready"
 
 # ============================================================
-# Run migrations
+# Run migrations (via bootstrap-migrations.sh)
 # ============================================================
 log "Running migrations..."
 
-# Use mariadb client inside the container
+# Helper for SQL inside the container
 run_sql() {
     docker compose -f "$COMPOSE_FILE" exec -T mariadb \
         mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub -e "$1" 2>/dev/null
 }
 
-# Create tracking table first
+SEED_FLAG=""
+if $INCLUDE_SEED_DATA; then
+    SEED_FLAG="--with-seed-data"
+fi
+
+# Use the containerized mariadb client for migrations
+chmod +x "$INSTALL_DIR/scripts/bootstrap-migrations.sh"
+
+# Create tracking table first (the runner does this too, but belt-and-suspenders)
 run_sql "CREATE TABLE IF NOT EXISTS _schema_migrations (
     version VARCHAR(255) PRIMARY KEY,
     applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
 
-# Apply each migration idempotently
+# Apply schema migrations
 for migration_file in migrations/*.sql; do
     version=$(basename "$migration_file")
     already=$(run_sql "SELECT COUNT(*) FROM _schema_migrations WHERE version = '${version}';" | tail -1 | tr -d '[:space:]')
@@ -286,6 +317,23 @@ for migration_file in migrations/*.sql; do
         || fail "Migration failed: $version"
     run_sql "INSERT INTO _schema_migrations (version) VALUES ('${version}');"
 done
+
+# Apply dev seed data only if explicitly requested
+if $INCLUDE_SEED_DATA && [[ -d "migrations/dev" ]]; then
+    log "  Including seed data (--include-seed-data)..."
+    for migration_file in migrations/dev/*.sql; do
+        version="dev/$(basename "$migration_file")"
+        already=$(run_sql "SELECT COUNT(*) FROM _schema_migrations WHERE version = '${version}';" | tail -1 | tr -d '[:space:]')
+        if [[ "$already" -gt 0 ]]; then
+            continue
+        fi
+        log "  Applying: $version"
+        docker compose -f "$COMPOSE_FILE" exec -T mariadb \
+            mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub < "$migration_file" 2>/dev/null \
+            || fail "Migration failed: $version"
+        run_sql "INSERT INTO _schema_migrations (version) VALUES ('${version}');"
+    done
+fi
 
 log "Migrations complete"
 

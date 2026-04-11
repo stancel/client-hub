@@ -168,3 +168,44 @@ async def revoke_api_key(uuid: str, db: AsyncSession = Depends(get_db)):
     api_key.is_active = False
     api_key.revoked_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+# --- Events endpoint (cross-source reporting) ---
+
+@router.get("/events")
+async def list_events(
+    source_code: str | None = None,
+    channel_code: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import text
+
+    query = "SELECT * FROM v_events_by_source WHERE 1=1"
+    params: dict = {}
+
+    if source_code:
+        query += " AND source_code = :source_code"
+        params["source_code"] = source_code
+    if channel_code:
+        query += " AND channel_code = :channel_code"
+        params["channel_code"] = channel_code
+    if date_from:
+        query += " AND occurred_at >= :date_from"
+        params["date_from"] = date_from
+    if date_to:
+        query += " AND occurred_at <= :date_to"
+        params["date_to"] = date_to + " 23:59:59"
+
+    query += " ORDER BY occurred_at DESC LIMIT :limit"
+    params["limit"] = min(limit, 1000)
+
+    result = await db.execute(text(query), params)
+    rows = result.mappings().all()
+
+    return {
+        "data": [dict(row) for row in rows],
+        "count": len(rows),
+    }
