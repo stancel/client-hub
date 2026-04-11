@@ -43,6 +43,12 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8800
       TZ: UTC
+    # Loopback-only host binding so install.sh and local ops scripts
+    # can curl the API directly without going through Caddy TLS (the
+    # cert may not be ready yet on first boot). UFW still blocks this
+    # port externally; only local processes on the VPS can reach it.
+    ports:
+      - "127.0.0.1:8800:8800"
     networks:
       - clienthub
 
