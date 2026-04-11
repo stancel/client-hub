@@ -10,15 +10,18 @@ Client Hub — Architecture
 Overview
 **********************************************************************
 
-Client Hub is a centralized data platform built on MariaDB that
-provides a single source of truth for client and prospect information
-across multiple business verticals. External applications interact
-exclusively through a REST API wrapper layer — no direct database
-access is permitted from external systems.
+Client Hub is a **data-first customer intelligence microservice**
+built on MariaDB that provides a single source of truth for client
+and prospect information across multiple business verticals.
 
-Client Hub does **not** run its own database. It uses the shared
-MariaDB instance at ``~/docker/mariadb/`` and the MySQL MCP Server
-at ``~/docker/mysql-mcp-server/`` for schema design.
+This is a data-first system: the database schema is the primary
+product. External applications can integrate at two levels:
+
+1. **API level** — REST endpoints via the FastAPI container
+2. **Database level** — Direct SQL from containers on ``my-main-net``
+   or via MCP tools (``apisix-mysql``)
+
+Both patterns are valid and supported.
 
 .. _client-hub-arch-infrastructure:
 
@@ -46,13 +49,9 @@ Infrastructure Dependencies
 Container Layout
 **********************************************************************
 
-Phase 1 (current): No containers — schema design only.
-
-Phase 2 (planned):
-
 .. list-table::
    :header-rows: 1
-   :widths: 25 20 15 15 25
+   :widths: 25 25 15 15 20
 
    * - Container
      - Image
@@ -60,10 +59,10 @@ Phase 2 (planned):
      - Container Port
      - Purpose
    * - client-hub-api
-     - TBD
+     - client-hub-client-hub-api
      - 8800
      - 8800
-     - REST API wrapper
+     - FastAPI REST API (Python 3.12)
 
 .. _client-hub-arch-network:
 
@@ -71,26 +70,33 @@ Phase 2 (planned):
 Network Architecture
 **********************************************************************
 
-The API container (Phase 2) will join ``my-main-net`` to reach the
-shared MariaDB instance via Docker DNS (``mariadb:3306``).
+All containers run on the ``my-main-net`` Docker bridge network.
+The API container connects to the shared MariaDB instance via
+Docker DNS (``mariadb:3306``).
 
 .. code-block:: text
 
-   Shared Network: my-main-net
-   │
-   ├── mariadb:3306 (~/docker/mariadb/)
-   │       ▲
-   │       │ SQL queries
-   │       │
-   ├── client-hub-api:8800 (Phase 2)
-   │       ▲
-   │       │ REST / Webhooks
-   │
-   └── mysql-mcp-server:8080 (~/docker/mysql-mcp-server/)
-           ▲
-           │ MCP tools (schema design)
-
-Host access: ``10.0.1.220:3306`` for direct MariaDB connections.
+   External Systems (Chatwoot, InvoiceNinja, CTI, etc.)
+          │
+          ▼ HTTP (webhooks, REST, lookups)
+   ┌─────────────────────────────────────────┐
+   │    client-hub-api (FastAPI)             │
+   │    Port 8800 on my-main-net            │
+   │    23 endpoints, X-API-Key auth        │
+   │    Swagger: /docs  OpenAPI: /openapi.json│
+   └─────────────────┬───────────────────────┘
+                     │ SQLAlchemy async (aiomysql)
+                     ▼
+   ┌─────────────────────────────────────────┐
+   │    Shared MariaDB 12.2.2               │
+   │    ~/docker/mariadb/ (port 3306)       │
+   │    Database: dev_schema                │
+   │    31 tables + 2 views (3NF)           │
+   └─────────────────────────────────────────┘
+          ▲                    ▲
+          │                    │
+   Direct SQL from         MCP tools via
+   my-main-net containers  mysql-mcp-server
 
 .. _client-hub-arch-database:
 
@@ -105,15 +111,19 @@ Database Configuration
    * - Setting
      - Value
    * - Database name
-     - ``clienthub_db``
-   * - Application user
-     - ``clienthub``
+     - ``dev_schema`` (development)
    * - Docker DNS host
      - ``mariadb``
    * - Port
      - ``3306``
    * - Host access
      - ``10.0.1.220:3306``
+   * - Tables
+     - 31 (18 entity + 2 junction + 11 lookup)
+   * - Views
+     - 2 (``v_contact_summary``, ``v_contact_last_order``)
+   * - Migrations
+     - 13 files in ``migrations/``
 
 .. _client-hub-arch-env:
 
@@ -121,22 +131,63 @@ Database Configuration
 Environment Configuration
 **********************************************************************
 
-Environment variables are stored in ``.env`` (git-ignored) and
-templated in ``.env.example`` (committed).
+Environment variables stored in ``.env`` (git-ignored), templated
+in ``.env.example`` (committed).
 
 .. list-table::
    :header-rows: 1
-   :widths: 35 15 50
+   :widths: 25 15 60
 
    * - Variable
      - Required
      - Description
+   * - ``DB_NAME``
+     - No
+     - Database name (default: ``dev_schema``)
    * - ``DB_USER``
      - No
-     - Application user (default: ``clienthub``)
+     - Database user (default: ``root``)
    * - ``DB_PASSWORD``
      - Yes
-     - Application user password
+     - Database password
+   * - ``API_KEY``
+     - No
+     - API authentication key (default: ``dev-api-key``)
+
+.. _client-hub-arch-api:
+
+**********************************************************************
+API Architecture
+**********************************************************************
+
+Stack: Python 3.12, FastAPI, SQLAlchemy 2.0 (async), aiomysql,
+Pydantic v2.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 30 50
+
+   * - Layer
+     - Directory
+     - Purpose
+   * - Routers
+     - ``api/app/routers/``
+     - Endpoint handlers (9 router modules)
+   * - Services
+     - ``api/app/services/``
+     - Business logic (contact, lookup, webhook)
+   * - Models
+     - ``api/app/models/``
+     - SQLAlchemy ORM (7 model modules)
+   * - Schemas
+     - ``api/app/schemas/``
+     - Pydantic request/response validation
+   * - Middleware
+     - ``api/app/middleware/``
+     - API key authentication
+   * - Tests
+     - ``api/tests/``
+     - 63 tests across 13 files (TDD, real DB)
 
 .. _client-hub-arch-data-model:
 
@@ -144,43 +195,30 @@ templated in ``.env.example`` (committed).
 Data Model Design Principles
 **********************************************************************
 
-The database schema follows these principles:
+1. **Data-first** — Schema is the product. DDL before API.
 
-1. **Business-agnostic** — No industry-specific columns. Business
-   context is stored as configurable metadata using lookup tables
-   and key-value patterns where appropriate.
+2. **Business-agnostic** — No industry-specific columns. Business
+   context via configurable lookup tables and key-value preferences.
 
-2. **Third Normal Form (3NF)** — Fully normalized with no transitive
-   dependencies. Denormalization only at the API/view layer if needed
-   for performance.
+3. **Third Normal Form (3NF)** — Fully normalized with no transitive
+   dependencies.
 
-3. **Single-tenant** — One database per business deployment.
-   Not multi-tenant in a single database.
+4. **Single-tenant** — One database per business deployment.
 
-4. **Audit trail** — All tables include ``created_at``,
+5. **Audit trail** — All tables include ``created_at``,
    ``updated_at``, and ``created_by`` columns.
 
-5. **Soft deletes** — Records use ``is_active`` / ``deleted_at``
-   rather than hard deletes.
+6. **Soft deletes** — ``is_active`` / ``deleted_at`` rather than
+   hard deletes.
 
-6. **Referential integrity** — Foreign keys enforced at the database
+7. **Referential integrity** — Foreign keys enforced at the database
    level with appropriate cascade rules.
 
-.. _client-hub-arch-core-entities:
+8. **Data provenance** — Contact details track source, enrichment
+   status, and verification timestamps.
 
-Core Entities (Planned)
-----------------------------------------------------------------------
-
-- **businesses** — Tenant/business records
-- **contacts** — Clients and prospects
-- **contact_types** — Client, prospect, lead, vendor, etc.
-- **addresses** — Polymorphic address records
-- **channels** — Communication channel definitions
-- **contact_channels** — Contact preferences per channel
-- **orders** — Orders and bookings
-- **order_items** — Line items within orders
-- **communications** — Communication log entries
-- **notes** — Free-text notes attached to any entity
+9. **Explicit marketing flags** — Boolean 1/0 opt-out columns for
+   SMS, email, and phone on the contacts table.
 
 .. _client-hub-arch-integrations:
 
@@ -188,36 +226,69 @@ Core Entities (Planned)
 Integration Architecture
 **********************************************************************
 
-External systems interact with Client Hub exclusively through the
-REST API. The API provides:
-
-- **CRUD endpoints** for all core entities
-- **Webhook receivers** for inbound events (e.g., InvoiceNinja
-  payment notifications)
-- **Search/lookup endpoints** for CTI caller identification
-- **Bulk operations** for data import/export
-
 .. list-table::
    :header-rows: 1
-   :widths: 20 20 20 40
+   :widths: 20 15 25 40
 
    * - System
      - Direction
      - Mechanism
-     - Use Case
+     - Status
    * - Chatwoot
      - Bidirectional
-     - REST webhooks
-     - Sync customer data on chat events
+     - Webhook + lookup
+     - Endpoint ready, live integration pending
    * - InvoiceNinja
      - Inbound
-     - REST webhooks
-     - Payment and contact update events
-   * - CTI
+     - Webhook
+     - Endpoint ready, live integration pending
+   * - CTI (SIP/Phone)
      - Outbound query
-     - REST GET
-     - Caller ID lookup on incoming calls
-   * - Website Chatbot
-     - Via Chatwoot
-     - REST
-     - Customer queries routed through Chatwoot
+     - Phone lookup API
+     - Endpoint ready, live integration pending
+   * - Zammad
+     - Bidirectional
+     - API CRUD
+     - Planned
+   * - Marketing platforms
+     - Inbound
+     - API CRUD
+     - Planned
+   * - Scheduling forms
+     - Inbound
+     - API CRUD
+     - Planned
+   * - Web scraping
+     - Inbound
+     - API CRUD
+     - Planned
+
+.. _client-hub-arch-sdks:
+
+**********************************************************************
+Client SDKs
+**********************************************************************
+
+Auto-generated from the OpenAPI spec at ``/openapi.json`` using
+``openapi-generator-cli`` v7.12.0 (Docker-based).
+
+- **Python** — ``sdks/python/`` — pip-installable ``clienthub``
+- **PHP** — ``sdks/php/`` — Composer-compatible
+- **TypeScript** — ``sdks/typescript/`` — npm-compatible, ES6
+
+Regenerate: ``./scripts/generate-sdks.sh``
+
+.. _client-hub-arch-ci-cd:
+
+**********************************************************************
+CI/CD Pipeline
+**********************************************************************
+
+GitHub Actions (``.github/workflows/ci.yml``):
+
+1. **Lint** — ruff (Python) + rstcheck (RST docs)
+2. **Test** — pytest against MariaDB 12 service container
+3. **Build** — Docker image build and verify
+4. **SDK Gen** — Regenerate SDKs (master branch only)
+
+See ``docs/ci-cd.rst`` for full details.

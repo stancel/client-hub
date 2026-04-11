@@ -5,23 +5,28 @@
 **Client Hub** is a **data-first customer intelligence microservice** — a centralized, business-agnostic MariaDB data store that compiles and enriches information from disparate systems (invoicing, marketing, telephony, chat, support, scheduling, web scraping) into a single source of truth. The database schema is the primary product; the REST API is a convenience layer. Both DB-level and API-level integration are valid patterns.
 
 - **App location:** `~/docker/client-hub/`
-- **Local URL:** http://10.0.1.220:8800 (API — not yet active)
-- **Public URL:** None (will be exposed after API layer is complete)
-- **Current status:** Phase 4 — API design (schema complete in dev_schema)
-- **Schema:** 31 tables + 2 views in `dev_schema`
+- **API URL:** http://10.0.1.220:8800
+- **Swagger UI:** http://10.0.1.220:8800/docs
+- **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
+- **Public URL:** None (will be exposed after live integrations are proven)
+- **GitHub:** https://github.com/stancel/client-hub
+- **Schema:** 31 tables + 2 views in `dev_schema` (3NF)
+- **API:** 23 endpoint paths, 63 tests passing
+- **SDKs:** Python, PHP, TypeScript (auto-generated)
+- **CI/CD:** GitHub Actions (lint → test → build → SDK gen)
 
 ### Data Sources That Feed Into Client Hub
 
-| System | What It Provides |
-|---|---|
-| InvoiceNinja | Invoicing, payments, contact updates |
-| Chatwoot | SMS/MMS, web chat, messaging |
-| SIP/Phone (CTI) | Call logs, caller ID |
-| Zammad | Support tickets, interactions |
-| Marketing platforms | Leads, campaign attribution |
-| Scheduling forms | Bookings, appointments |
-| Web scraping / APIs | Data enrichment, verification |
-| Manual entry | Staff input |
+| System | What It Provides | Integration Method |
+|---|---|---|
+| InvoiceNinja | Invoicing, payments, contact updates | Webhook endpoint |
+| Chatwoot | SMS/MMS, web chat, messaging | Webhook endpoint |
+| SIP/Phone (CTI) | Call logs, caller ID | Phone lookup endpoint |
+| Zammad | Support tickets, interactions | Planned |
+| Marketing platforms | Leads, campaign attribution | API CRUD |
+| Scheduling forms | Bookings, appointments | API CRUD |
+| Web scraping / APIs | Data enrichment, verification | API CRUD |
+| Manual entry | Staff input | API CRUD / direct SQL |
 
 ## Database Infrastructure
 
@@ -46,81 +51,106 @@ These are available as the `apisix-mysql` MCP server in Claude Code.
 
 ## Architecture
 
-### Current (Phase 1)
-
-No containers — schema design only, using the shared MariaDB and MCP tools.
-
-### Planned (Phase 2+)
+### Containers
 
 | Container | Image | Port (host:container) | Purpose |
 |---|---|---|---|
-| client-hub-api | TBD | 8800:8800 | REST API wrapper |
+| client-hub-api | client-hub-client-hub-api (local build) | 8800:8800 | FastAPI REST API |
 
-The API container will join `my-main-net` to reach `mariadb:3306`.
+The API container runs on `my-main-net` and connects to `mariadb:3306`.
 
 ### Key Directories
 
 ```
 client-hub/
-├── init/             # SQL schema and seed scripts
-├── api/              # API source code (Phase 2)
+├── api/              # FastAPI application (Python 3.12)
+│   ├── app/          # Models, routers, schemas, services
+│   └── tests/        # 63 tests across 13 files
+├── migrations/       # 13 numbered SQL migration files
+├── scripts/          # generate-sdks.sh
+├── sdks/             # Auto-generated Python, PHP, TypeScript SDKs
 ├── docs/             # RST documentation
 ├── upgrades/         # Pre-upgrade analysis documents
-└── screenshots/      # Local-only reference (git-ignored)
+└── .github/          # CI/CD workflows
 ```
 
-## Compose Files
+## API Endpoints (23 paths)
 
-- `docker-compose.yml` — Will hold the API service (Phase 2); currently a placeholder
+| Category | Endpoints |
+|---|---|
+| Health | `GET /api/v1/health` |
+| Lookup | `GET /api/v1/lookup/phone/{number}`, `GET /api/v1/lookup/email/{email}` |
+| Contacts | CRUD + convert + summary + marketing opt-outs + preferences |
+| Organizations | CRUD |
+| Orders | CRUD + status changes with history |
+| Invoices | CRUD + payment recording (auto-balance update) |
+| Communications | List, get, create interaction logs |
+| Webhooks | `POST /api/v1/webhooks/invoiceninja`, `POST /api/v1/webhooks/chatwoot` |
+| Settings | `GET/PUT /api/v1/settings` |
 
-## Integration Points
-
-| System | Direction | Mechanism | Status |
-|---|---|---|---|
-| Chatwoot | Bidirectional | REST API webhooks | Planned |
-| InvoiceNinja | Inbound | REST API webhooks | Planned |
-| CTI (Telephony) | Outbound query | REST API GET | Planned |
-| Website Chatbot | Via Chatwoot | REST API | Planned |
+Auth: `X-API-Key` header on all protected routes.
 
 ## Key Commands
 
 ```bash
-# Connect to MariaDB (from host)
-mariadb -h 10.0.1.220 -P 3306 -u clienthub -p clienthub_db
+# API status
+cd ~/docker/client-hub && docker compose ps
 
-# Connect via shared MariaDB container
-docker exec -it mariadb mariadb -u clienthub -p clienthub_db
+# API logs
+docker compose logs --tail=50 client-hub-api
+
+# Restart API
+docker compose restart client-hub-api
+
+# Rebuild and restart
+docker compose down && docker compose build && docker compose up -d
+
+# Connect to database
+mariadb -h 10.0.1.220 -P 3306 -u root -p dev_schema
+
+# Run tests
+cd api && .venv/bin/python -m pytest tests/ -v
+
+# Lint Python
+cd api && .venv/bin/ruff check app/ tests/
+
+# Generate SDKs
+./scripts/generate-sdks.sh
 
 # Backup database
-docker exec mariadb mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" clienthub_db > backups/clienthub_$(date +%Y%m%d_%H%M%S).sql
+docker exec mariadb mariadb-dump -u root -p dev_schema > backups/dev_$(date +%Y%m%d_%H%M%S).sql
 
 # Restore from backup
-docker exec -i mariadb mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub_db < backups/FILENAME.sql
-
-# Check shared MariaDB status
-cd ~/docker/mariadb && docker compose ps
+docker exec -i mariadb mariadb -u root -p dev_schema < backups/FILENAME.sql
 ```
 
 ## Troubleshooting
 
 ```bash
+# Check API container
+docker compose ps
+docker compose logs --tail=50 client-hub-api
+
 # Check shared MariaDB is running
 cd ~/docker/mariadb && docker compose ps
 
-# View MariaDB logs
-cd ~/docker/mariadb && docker compose logs --tail=50
-
 # Test database connectivity
-mariadb -h 10.0.1.220 -P 3306 -u clienthub -p -e "SELECT 1;"
+mariadb -h 10.0.1.220 -P 3306 -u root -p -e "USE dev_schema; SELECT COUNT(*) FROM contacts;"
 
-# Check if clienthub_db exists
-docker exec mariadb mariadb -u root -p -e "SHOW DATABASES;"
+# Test API health
+curl -s http://10.0.1.220:8800/api/v1/health | python3 -m json.tool
+
+# Test authenticated endpoint
+curl -s -H "X-API-Key: dev-api-key" http://10.0.1.220:8800/api/v1/contacts | python3 -m json.tool
 
 # Check MCP server is available
 cd ~/docker/mysql-mcp-server && docker compose ps
 
 # Check disk usage
-docker system df -v 2>&1 | grep mariadb
+docker system df -v 2>&1 | grep -E "mariadb|client-hub"
+
+# Full recreate
+docker compose down && docker compose build --no-cache && docker compose up -d
 ```
 
 ## Data Model Design Principles
@@ -139,3 +169,29 @@ docker system df -v 2>&1 | grep mariadb
 
 - `v_contact_summary` — Holistic intelligence: lifetime value, order stats, communication stats, marketing sources, tags, opt-outs, outstanding balance
 - `v_contact_last_order` — Last order details per contact: order number, date, status, total, item types
+
+## Testing (TDD)
+
+Every API endpoint has a corresponding test. Tests hit the real database.
+
+- **63 tests** across 13 test files
+- Framework: pytest + httpx + AsyncClient
+- Run: `cd api && .venv/bin/python -m pytest tests/ -v`
+- Coverage: `pytest --cov=app --cov-report=term-missing`
+
+## SDK Generation
+
+Auto-generated from OpenAPI spec. Regenerate on any API change:
+
+```bash
+./scripts/generate-sdks.sh           # All: Python, PHP, TypeScript
+./scripts/generate-sdks.sh python    # Just Python
+```
+
+## CI/CD Pipeline
+
+GitHub Actions (`.github/workflows/ci.yml`):
+1. **Lint** — ruff + rstcheck
+2. **Test** — pytest against MariaDB 12 service container
+3. **Build** — Docker image
+4. **SDK Gen** — Regenerate SDKs (master branch only)

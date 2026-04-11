@@ -4,6 +4,20 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-11:
+
+2026-04-11 — Full Documentation Refresh
+======================================================================
+
+- Rewrote README.rst to reflect complete project state: all 7 phases
+  done, 23 endpoints, 63 tests, 3 SDKs, CI/CD pipeline, full
+  architecture diagram, endpoint table, project structure tree
+- Rewrote CLAUDE.md with current container info, all key commands,
+  troubleshooting for the live API, SDK generation, CI/CD details
+- Updated architecture.rst with live container layout and integration
+  patterns (webhook, lookup, CRUD, direct SQL)
+- All docs now accurately reflect the running system
+
 .. _client-hub-changelog-2026-04-05h:
 
 2026-04-05 — All API Endpoints Complete: 63 Tests, 23 Paths
