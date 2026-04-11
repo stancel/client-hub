@@ -91,8 +91,13 @@ reach the API directly without going through TLS termination.
 
 
 **********************************************************************
-Section 2 — Smoke test bug (needs investigation + fix)
+Section 2 — API bugs (needs investigation + fix)
 **********************************************************************
+
+Two bugs found during live verification on 2026-04-11.
+
+2a — Smoke test assertion: GET /contacts without key returns 401
+======================================================================
 
 The installer's smoke test at the end of the successful install
 reported 1 failure out of 7:
@@ -136,6 +141,115 @@ is missing is ``403 Forbidden``, not 401).
    ``401|403`` or rewrite the middleware to return 401. Your call.
 
 5. Re-run the smoke test and confirm 7/7 pass.
+
+
+2b — CRITICAL: POST /contacts silently drops external_refs_json
+======================================================================
+
+**Severity:** High — every contact created via the API has been
+losing its rich metadata (IP address, user agent, referrer, UTM
+parameters, scheduler appointment IDs, service names, start times,
+etc.). The ``contacts.external_refs_json`` column is always NULL.
+
+**Discovery:** End-to-end testing of the dental care booking flow
+on 2026-04-11. ``lib/client-hub.ts`` sends a POST body of the shape::
+
+   {
+     contact_type: "lead",
+     first_name: "Brad",
+     last_name: "Stancel",
+     emails: [{address: "brad@example.com", is_primary: true}],
+     phones: [{number: "8035551234", is_primary: true}],
+     external_refs_json: {
+       source_page: "/book",
+       referrer: "https://completedentalcarecolumbia.com/",
+       user_agent: "Mozilla/5.0 ...",
+       ip_address: "71.68.131.185",
+       extra: {
+         scheduler_event: "booking.created",
+         appointment_id: 42,
+         service_name: "Cleaning and Exam",
+         staff_name: "Dr. Dan Meader",
+         start_date: "2026-04-30T13:30:00.000Z"
+       }
+     }
+   }
+
+The contact is created successfully (201) with the name, emails,
+and phones all persisted. But a subsequent
+``SELECT external_refs_json FROM contacts WHERE first_name='Brad'``
+returns ``NULL``.
+
+**Root cause:** The ``Contact`` ORM model in
+``api/app/models/contact.py`` has the column::
+
+    external_refs_json: Mapped[str | None] = mapped_column(Text)
+
+But there is NO reference to ``external_refs_json`` in any file
+under ``api/app/schemas/`` (verified via grep). That means the
+Pydantic request model for ``POST /api/v1/contacts`` does not
+declare it as a field, and FastAPI/Pydantic silently ignores
+unknown keys in the request body by default. Result: the field is
+dropped at the schema layer before it ever reaches the ORM.
+
+**Fix:**
+
+1. In the Pydantic schema for ``ContactCreate`` (probably
+   ``api/app/schemas/contact.py``), add::
+
+     external_refs_json: dict[str, Any] | None = None
+
+   Use ``dict[str, Any]`` rather than a stricter shape so sites
+   can attach arbitrary metadata (we formalize the convention in
+   docs but don't enforce it in the schema — that's intentional
+   flexibility for cross-site integrations).
+
+2. In the contact create service, serialize the dict to a JSON
+   string before assigning to the ORM column (since the column is
+   ``Text``, not ``JSON``)::
+
+     import json
+     contact.external_refs_json = (
+         json.dumps(payload.external_refs_json)
+         if payload.external_refs_json is not None
+         else None
+     )
+
+3. Also add it to the ``ContactUpdate`` schema for
+   ``PUT /api/v1/contacts/{uuid}`` so clients can append to or
+   replace the metadata later (decide on merge semantics — I
+   recommend **replace** for simplicity; sites that want to merge
+   can GET-then-PUT).
+
+4. Consider changing the column type from ``Text`` to ``JSON``
+   in a new migration — MariaDB 12 supports JSON natively, and
+   it enables ``JSON_EXTRACT`` / ``JSON_SET`` queries (which
+   ``v_events_by_source`` could leverage for cleaner reporting).
+   This is a nice-to-have, not a blocker.
+
+5. Add a test in ``api/tests/test_contacts.py`` that creates a
+   contact with ``external_refs_json`` in the body and asserts
+   ``SELECT external_refs_json`` returns the same dict after
+   round-trip.
+
+6. Also check ``Organization.external_refs_json`` and
+   ``Order.external_refs_json`` — same model columns exist
+   (verified via grep). If the same bug exists for those POST
+   endpoints, fix them too.
+
+7. After shipping the fix, the dental care site's already-wired
+   ``lib/client-hub.ts`` will start persisting the rich metadata
+   with zero changes on the Next.js side. Brad can then query::
+
+     SELECT first_name, last_name,
+            JSON_EXTRACT(external_refs_json, '$.extra.service_name') AS service
+     FROM contacts
+     WHERE external_refs_json IS NOT NULL;
+
+**Impact on the already-installed instance:** existing contacts
+will still have NULL ``external_refs_json`` (historical data is
+lost). Once the fix ships, new contacts from that point forward
+will have the full metadata. No migration needed.
 
 
 **********************************************************************
