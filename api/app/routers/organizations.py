@@ -1,5 +1,6 @@
 import uuid as uuid_mod
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.middleware.auth import require_api_key
 from app.models.organization import OrgAddress, Organization, OrgEmail, OrgPhone
+from app.services.contact_service import deserialize_external_refs, serialize_external_refs
 
 router = APIRouter(prefix="/organizations", tags=["organizations"], dependencies=[Depends(require_api_key)])
 
@@ -18,6 +20,7 @@ class OrgCreate(BaseModel):
     name: str
     org_type: str | None = None
     website: str | None = None
+    external_refs_json: dict[str, Any] | None = None
 
 
 class OrgUpdate(BaseModel):
@@ -25,6 +28,7 @@ class OrgUpdate(BaseModel):
     org_type: str | None = None
     website: str | None = None
     notes_text: str | None = None
+    external_refs_json: dict[str, Any] | None = None
 
 
 @router.get("")
@@ -92,6 +96,7 @@ async def get_organization(uuid: str, db: AsyncSession = Depends(get_db)):
              "state": a.state, "postal_code": a.postal_code, "is_primary": a.is_primary}
             for a in org.addresses
         ],
+        "external_refs_json": deserialize_external_refs(org.external_refs_json),
         "contact_count": contact_count,
         "is_active": org.is_active,
     }
@@ -99,11 +104,22 @@ async def get_organization(uuid: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("", status_code=201)
 async def create_organization(body: OrgCreate, db: AsyncSession = Depends(get_db)):
-    org = Organization(uuid=str(uuid_mod.uuid4()), name=body.name, org_type=body.org_type, website=body.website, created_by="api")
+    org = Organization(
+        uuid=str(uuid_mod.uuid4()),
+        name=body.name,
+        org_type=body.org_type,
+        website=body.website,
+        external_refs_json=serialize_external_refs(body.external_refs_json),
+        created_by="api",
+    )
     db.add(org)
     await db.commit()
     await db.refresh(org)
-    return {"uuid": org.uuid, "name": org.name}
+    return {
+        "uuid": org.uuid,
+        "name": org.name,
+        "external_refs_json": deserialize_external_refs(org.external_refs_json),
+    }
 
 
 @router.put("/{uuid}")
@@ -111,7 +127,10 @@ async def update_organization(uuid: str, body: OrgUpdate, db: AsyncSession = Dep
     org = await _get_org(db, uuid)
     if not org:
         raise HTTPException(status_code=404, detail=f"Organization {uuid} not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    update_data = body.model_dump(exclude_unset=True)
+    if "external_refs_json" in update_data:
+        org.external_refs_json = serialize_external_refs(update_data.pop("external_refs_json"))
+    for field, value in update_data.items():
         if hasattr(org, field):
             setattr(org, field, value)
     await db.commit()

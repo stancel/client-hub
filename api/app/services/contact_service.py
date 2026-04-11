@@ -1,5 +1,8 @@
+import json
+import logging
 import uuid as uuid_mod
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +20,24 @@ from app.models.contact import (
 from app.models.invoice import Invoice
 from app.models.lookups import ContactType, EmailType, MarketingSource, PhoneType
 from app.models.order import Order
+
+logger = logging.getLogger(__name__)
+
+
+def serialize_external_refs(value: dict[str, Any] | None) -> str | None:
+    if value is None:
+        return None
+    return json.dumps(value)
+
+
+def deserialize_external_refs(value: str | None) -> dict[str, Any] | None:
+    if not value:
+        return None
+    try:
+        return json.loads(value)
+    except (ValueError, TypeError):
+        logger.warning("Failed to parse external_refs_json; returning None")
+        return None
 
 
 async def list_contacts(
@@ -126,6 +147,7 @@ async def create_contact(db: AsyncSession, data: dict, source_id: int | None = N
         last_name=data["last_name"],
         display_name=data.get("display_name"),
         enrichment_status="partial",
+        external_refs_json=serialize_external_refs(data.get("external_refs_json")),
         created_by=data.get("data_source", "api"),
     )
 

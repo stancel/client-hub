@@ -56,3 +56,36 @@ async def test_delete_organization(client, auth_headers):
 async def test_get_organization_not_found(client, auth_headers):
     resp = await client.get("/api/v1/organizations/00000000-0000-0000-0000-000000000000", headers=auth_headers)
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_organization_with_external_refs_json(client, auth_headers):
+    refs = {"eaglesoft_id": "E-9912", "source": "import"}
+    resp = await client.post("/api/v1/organizations", headers=auth_headers, json={
+        "name": "Refs Corp", "external_refs_json": refs,
+    })
+    assert resp.status_code == 201
+    assert resp.json()["external_refs_json"] == refs
+
+    uuid = resp.json()["uuid"]
+    get_resp = await client.get(f"/api/v1/organizations/{uuid}", headers=auth_headers)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["external_refs_json"] == refs
+
+
+@pytest.mark.asyncio
+async def test_update_organization_external_refs_json(client, auth_headers):
+    create_resp = await client.post("/api/v1/organizations", headers=auth_headers, json={
+        "name": "Refs Update Corp", "external_refs_json": {"initial": 1},
+    })
+    uuid = create_resp.json()["uuid"]
+
+    new_refs = {"updated": True, "rev": 2}
+    put_resp = await client.put(
+        f"/api/v1/organizations/{uuid}", headers=auth_headers,
+        json={"external_refs_json": new_refs},
+    )
+    assert put_resp.status_code == 200
+
+    get_resp = await client.get(f"/api/v1/organizations/{uuid}", headers=auth_headers)
+    assert get_resp.json()["external_refs_json"] == new_refs

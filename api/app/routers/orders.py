@@ -1,6 +1,7 @@
 import uuid as uuid_mod
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ from app.database import get_db
 from app.middleware.auth import require_api_key
 from app.models.lookups import OrderItemType, OrderStatus
 from app.models.order import Order, OrderItem, OrderStatusHistory
+from app.services.contact_service import deserialize_external_refs, serialize_external_refs
 
 router = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(require_api_key)])
 
@@ -31,6 +33,7 @@ class OrderCreate(BaseModel):
     scheduled_at: str | None = None
     items: list[OrderItemCreate] = []
     notes_text: str | None = None
+    external_refs_json: dict[str, Any] | None = None
 
 
 class StatusChange(BaseModel):
@@ -116,6 +119,7 @@ async def get_order(uuid: str, db: AsyncSession = Depends(get_db)):
             for h in sorted(order.status_history, key=lambda x: x.created_at)
         ],
         "notes_text": order.notes_text,
+        "external_refs_json": deserialize_external_refs(order.external_refs_json),
     }
 
 
@@ -147,14 +151,21 @@ async def create_order(body: OrderCreate, db: AsyncSession = Depends(get_db)):
     order = Order(
         uuid=str(uuid_mod.uuid4()), contact_id=contact.id, order_status_id=status.id,
         order_date=body.order_date, due_date=body.due_date,
-        subtotal=subtotal, total=subtotal, notes_text=body.notes_text, created_by="api",
+        subtotal=subtotal, total=subtotal, notes_text=body.notes_text,
+        external_refs_json=serialize_external_refs(body.external_refs_json),
+        created_by="api",
     )
     order.items = order_items
     order.status_history = [OrderStatusHistory(to_status_id=status.id, changed_by="api")]
     db.add(order)
     await db.commit()
     await db.refresh(order)
-    return {"uuid": order.uuid, "order_number": order.order_number, "total": str(order.total)}
+    return {
+        "uuid": order.uuid,
+        "order_number": order.order_number,
+        "total": str(order.total),
+        "external_refs_json": deserialize_external_refs(order.external_refs_json),
+    }
 
 
 @router.post("/{uuid}/status")

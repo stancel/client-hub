@@ -13,9 +13,11 @@ from app.schemas.contact import (
 from app.services.contact_service import (
     convert_contact,
     create_contact,
+    deserialize_external_refs,
     get_contact_by_uuid,
     get_contact_summary,
     list_contacts,
+    serialize_external_refs,
 )
 
 router = APIRouter(prefix="/contacts", tags=["contacts"], dependencies=[Depends(require_api_key)])
@@ -76,6 +78,7 @@ async def get_contact_endpoint(uuid: str, db: AsyncSession = Depends(get_db)):
             {"text": n.note_text, "created_by": n.created_by, "created_at": n.created_at.isoformat()}
             for n in contact.notes
         ],
+        "external_refs_json": deserialize_external_refs(contact.external_refs_json),
         "is_active": contact.is_active,
         "created_at": contact.created_at.isoformat() if contact.created_at else None,
     }
@@ -91,7 +94,12 @@ async def create_contact_endpoint(
         contact = await create_contact(db, body.model_dump(), source_id=ctx.source_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"uuid": contact.uuid, "first_name": contact.first_name, "last_name": contact.last_name}
+    return {
+        "uuid": contact.uuid,
+        "first_name": contact.first_name,
+        "last_name": contact.last_name,
+        "external_refs_json": deserialize_external_refs(contact.external_refs_json),
+    }
 
 
 @router.put("/{uuid}")
@@ -101,6 +109,8 @@ async def update_contact_endpoint(uuid: str, body: ContactUpdate, db: AsyncSessi
         raise HTTPException(status_code=404, detail=f"Contact {uuid} not found")
 
     update_data = body.model_dump(exclude_unset=True)
+    if "external_refs_json" in update_data:
+        contact.external_refs_json = serialize_external_refs(update_data.pop("external_refs_json"))
     for field, value in update_data.items():
         if hasattr(contact, field):
             setattr(contact, field, value)

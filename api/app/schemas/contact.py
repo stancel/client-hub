@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -128,6 +129,7 @@ class ContactCreate(BaseModel):
     emails: list[ContactCreateEmail] = []
     marketing_sources: list[str] = []
     data_source: str | None = None
+    external_refs_json: dict[str, Any] | None = None
 
 
 class ContactUpdate(BaseModel):
@@ -138,6 +140,7 @@ class ContactUpdate(BaseModel):
     organization_uuid: str | None = None
     enrichment_status: str | None = None
     notes_text: str | None = None
+    external_refs_json: dict[str, Any] | None = None
 
 
 class MarketingOptOuts(BaseModel):

@@ -4,6 +4,39 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-11d:
+
+2026-04-11 — Fix external_refs_json Data-Loss Bug
+======================================================================
+
+Fix for silent data loss on every ``POST /api/v1/contacts``
+(and the same issue on Organization and Order create/update):
+
+- **Root cause:** ``external_refs_json`` existed on the ORM models
+  for Contact, Organization, and Order but was not declared on any
+  Pydantic request schema, so FastAPI silently stripped the field
+  from every create/update body before it reached the service
+  layer. Every row created via the API had ``external_refs_json``
+  NULL even when the client sent rich metadata.
+- **Fix (Contact):** added
+  ``external_refs_json: dict[str, Any] | None`` to
+  ``ContactCreate`` / ``ContactUpdate``; GET/POST/PUT responses now
+  return the parsed dict. Service layer serializes dict → JSON
+  string on write, deserializes defensively on read (malformed
+  rows log a warning and return ``None`` instead of 500).
+- **Fix (Organization, Order):** same field added to their inline
+  create/update Pydantic schemas; create and GET responses now
+  round-trip the value.
+- **Tests:** 7 new round-trip tests across
+  ``test_contacts.py``, ``test_organizations.py``, and
+  ``test_orders.py`` (with value, without value, update,
+  deep-nested). ``pytest`` now reports **89 passed** (was 82).
+- **Impact:** unblocks the dental care integration's
+  ``lib/client-hub.ts`` payload (source_page, ip_address,
+  user_agent, nested ``extra`` with appointment_id / service_name
+  / staff_name / start_date / total_price) and future Eaglesoft
+  sync metadata. Client-side code needs no changes.
+
 .. _client-hub-changelog-2026-04-11c:
 
 2026-04-11 — Post-Deployment Fixes and Hardening
