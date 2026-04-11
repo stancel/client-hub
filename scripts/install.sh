@@ -153,10 +153,11 @@ if ! id clienthub &>/dev/null; then
     usermod -aG docker clienthub
 fi
 
-mkdir -p "$INSTALL_DIR" "$INSTALL_DIR/backups" /var/log/client-hub
-chown clienthub:clienthub "$INSTALL_DIR" "$INSTALL_DIR/backups" /var/log/client-hub
-chmod 0750 "$INSTALL_DIR"
-chmod 0700 "$INSTALL_DIR/backups"
+# Only create log dir + parent before clone. $INSTALL_DIR itself and
+# its backups/ subdir are created AFTER the clone — git clone refuses
+# to clone into a non-empty directory, so we must not pre-create them.
+mkdir -p /var/log/client-hub
+chown clienthub:clienthub /var/log/client-hub
 chmod 0750 /var/log/client-hub
 
 # ============================================================
@@ -164,16 +165,27 @@ chmod 0750 /var/log/client-hub
 # ============================================================
 if [[ -n "${CLIENTHUB_TARBALL_URL:-}" ]]; then
     log "Downloading from tarball: $CLIENTHUB_TARBALL_URL"
+    mkdir -p "$INSTALL_DIR"
     curl -fsSL "$CLIENTHUB_TARBALL_URL" | tar -xz -C "$INSTALL_DIR" --strip-components=1
 else
     if [[ -d "$INSTALL_DIR/.git" ]]; then
         log "Updating existing repo..."
         cd "$INSTALL_DIR" && git pull --ff-only
+    elif [[ -d "$INSTALL_DIR" ]]; then
+        # Directory exists but is not a git clone — fail loudly so we
+        # don't accidentally clobber someone's files.
+        fail "$INSTALL_DIR exists but is not a git repo. Remove it and re-run, or use --install-dir."
     else
         log "Cloning repository..."
         git clone "$REPO_URL" "$INSTALL_DIR"
     fi
 fi
+
+# Now that source is in place, create auxiliary dirs and set ownership
+mkdir -p "$INSTALL_DIR/backups"
+chown -R clienthub:clienthub "$INSTALL_DIR"
+chmod 0750 "$INSTALL_DIR"
+chmod 0700 "$INSTALL_DIR/backups"
 
 cd "$INSTALL_DIR"
 
