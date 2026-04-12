@@ -1,7 +1,7 @@
 -- Migration 016: Cross-project Web Factory channel types
 -- These are the canonical event codes every Web Factory site uses.
 
-INSERT INTO channel_types (code, label, description, sort_order) VALUES
+INSERT IGNORE INTO channel_types (code, label, description, sort_order) VALUES
   ('web_form',            'Web Form',            'Contact form submission from a website',                   10),
   ('appointment_request', 'Appointment Request', 'Online appointment request (pre-scheduler)',               11),
   ('booking_started',     'Booking Started',     'User started the booking flow',                            12),

@@ -1,7 +1,7 @@
 -- Migration 007: Contact channel preferences, marketing sources, tags, notes
 -- Depends on: contacts, channel_types, marketing_sources, tags
 
-CREATE TABLE contact_channel_prefs (
+CREATE TABLE IF NOT EXISTS contact_channel_prefs (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     contact_id BIGINT UNSIGNED NOT NULL,
     channel_type_id BIGINT UNSIGNED NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE contact_channel_prefs (
     CONSTRAINT fk_ccp_channel FOREIGN KEY (channel_type_id) REFERENCES channel_types(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE contact_marketing_sources (
+CREATE TABLE IF NOT EXISTS contact_marketing_sources (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     contact_id BIGINT UNSIGNED NOT NULL,
     marketing_source_id BIGINT UNSIGNED NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE contact_marketing_sources (
     CONSTRAINT fk_cms_source FOREIGN KEY (marketing_source_id) REFERENCES marketing_sources(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE contact_tag_map (
+CREATE TABLE IF NOT EXISTS contact_tag_map (
     contact_id BIGINT UNSIGNED NOT NULL,
     tag_id BIGINT UNSIGNED NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -39,7 +39,7 @@ CREATE TABLE contact_tag_map (
     CONSTRAINT fk_ctm_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE contact_notes (
+CREATE TABLE IF NOT EXISTS contact_notes (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     contact_id BIGINT UNSIGNED NOT NULL,
     note_text TEXT NOT NULL,

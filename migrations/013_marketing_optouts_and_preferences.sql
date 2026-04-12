@@ -23,7 +23,7 @@ ALTER TABLE contacts
 -- Stores arbitrary preferences: preferred contact time, language,
 -- special instructions, communication frequency, etc.
 
-CREATE TABLE contact_preferences (
+CREATE TABLE IF NOT EXISTS contact_preferences (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     contact_id BIGINT UNSIGNED NOT NULL,
     pref_key VARCHAR(100) NOT NULL,

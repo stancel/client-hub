@@ -279,15 +279,59 @@ docker compose -f "$COMPOSE_FILE" exec -T mariadb \
 
 log "MariaDB is ready"
 
+# Brief pause — MariaDB can respond to ping before it's fully ready for piped SQL
+sleep 3
+
 # ============================================================
 # Run migrations (via bootstrap-migrations.sh)
 # ============================================================
 log "Running migrations..."
 
+# Helper: write a partial install summary so credentials are never lost
+write_partial_summary() {
+    local reason="$1"
+    if [[ -n "$DOMAIN" ]]; then
+        API_URL_DISPLAY="https://$DOMAIN"
+    else
+        API_URL_DISPLAY="http://$(hostname -I | awk '{print $1}'):8800"
+    fi
+    local PARTIAL_SUMMARY="=====================================================
+Client Hub Installation INCOMPLETE — $reason
+=====================================================
+
+Install path:  $INSTALL_DIR
+Mode:          $MODE
+Domain:        ${DOMAIN:-none (plain HTTP on port 8800)}
+API URL:       $API_URL_DISPLAY
+
+Credentials (SAVE THESE — installation can be retried):
+
+  Root API key (admin, cross-source):
+    $CLIENTHUB_ROOT_API_KEY
+
+  First source code:
+    $FIRST_SOURCE_CODE
+
+  First source API key (write, source-scoped):
+    $FIRST_SOURCE_API_KEY
+
+  MariaDB root password:
+    $MARIADB_ROOT_PASSWORD
+
+  MariaDB clienthub password:
+    $DB_PASSWORD
+
+To retry: cd $INSTALL_DIR && ./scripts/install.sh (or re-run the curl installer)
+====================================================="
+    echo "$PARTIAL_SUMMARY" | tee "$INSTALL_DIR/.install-summary"
+    chown clienthub:clienthub "$INSTALL_DIR/.install-summary" 2>/dev/null || true
+    chmod 0600 "$INSTALL_DIR/.install-summary" 2>/dev/null || true
+}
+
 # Helper for SQL inside the container
 run_sql() {
     docker compose -f "$COMPOSE_FILE" exec -T mariadb \
-        mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub -e "$1" 2>/dev/null
+        mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub -e "$1" 2>&1
 }
 
 SEED_FLAG=""
@@ -312,9 +356,11 @@ for migration_file in migrations/*.sql; do
         continue
     fi
     log "  Applying: $version"
-    docker compose -f "$COMPOSE_FILE" exec -T mariadb \
-        mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub < "$migration_file" 2>/dev/null \
-        || fail "Migration failed: $version"
+    if ! docker compose -f "$COMPOSE_FILE" exec -T mariadb \
+        mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub < "$migration_file" 2>&1; then
+        write_partial_summary "Migration failed: $version"
+        fail "Migration failed: $version — credentials saved to $INSTALL_DIR/.install-summary"
+    fi
     run_sql "INSERT INTO _schema_migrations (version) VALUES ('${version}');"
 done
 
@@ -328,9 +374,11 @@ if $INCLUDE_SEED_DATA && [[ -d "migrations/dev" ]]; then
             continue
         fi
         log "  Applying: $version"
-        docker compose -f "$COMPOSE_FILE" exec -T mariadb \
-            mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub < "$migration_file" 2>/dev/null \
-            || fail "Migration failed: $version"
+        if ! docker compose -f "$COMPOSE_FILE" exec -T mariadb \
+            mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub < "$migration_file" 2>&1; then
+            write_partial_summary "Dev seed migration failed: $version"
+            fail "Migration failed: $version — credentials saved to $INSTALL_DIR/.install-summary"
+        fi
         run_sql "INSERT INTO _schema_migrations (version) VALUES ('${version}');"
     done
 fi

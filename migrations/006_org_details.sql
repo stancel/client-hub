@@ -1,7 +1,7 @@
 -- Migration 006: Organization detail tables (phones, emails, addresses)
 -- Depends on: organizations, phone_types, email_types, address_types
 
-CREATE TABLE org_phones (
+CREATE TABLE IF NOT EXISTS org_phones (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     organization_id BIGINT UNSIGNED NOT NULL,
     phone_type_id BIGINT UNSIGNED NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE org_phones (
     CONSTRAINT fk_op_phone_type FOREIGN KEY (phone_type_id) REFERENCES phone_types(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE org_emails (
+CREATE TABLE IF NOT EXISTS org_emails (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     organization_id BIGINT UNSIGNED NOT NULL,
     email_type_id BIGINT UNSIGNED NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE org_emails (
     CONSTRAINT fk_oe_email_type FOREIGN KEY (email_type_id) REFERENCES email_types(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE org_addresses (
+CREATE TABLE IF NOT EXISTS org_addresses (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     organization_id BIGINT UNSIGNED NOT NULL,
     address_type_id BIGINT UNSIGNED NOT NULL,

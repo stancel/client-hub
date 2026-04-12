@@ -1,7 +1,7 @@
 -- Migration 004: Contacts (central entity)
 -- Depends on: contact_types, organizations
 
-CREATE TABLE contacts (
+CREATE TABLE IF NOT EXISTS contacts (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     contact_type_id BIGINT UNSIGNED NOT NULL,

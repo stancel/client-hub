@@ -1,7 +1,7 @@
 -- Migration 008: Orders, order items, order status history
 -- Depends on: contacts, order_statuses, order_item_types
 
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     contact_id BIGINT UNSIGNED NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE orders (
     CONSTRAINT fk_orders_status FOREIGN KEY (order_status_id) REFERENCES order_statuses(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE order_items (
+CREATE TABLE IF NOT EXISTS order_items (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT UNSIGNED NOT NULL,
     item_type_id BIGINT UNSIGNED NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE order_items (
     CONSTRAINT fk_oi_item_type FOREIGN KEY (item_type_id) REFERENCES order_item_types(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE order_status_history (
+CREATE TABLE IF NOT EXISTS order_status_history (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT UNSIGNED NOT NULL,
     from_status_id BIGINT UNSIGNED NULL,

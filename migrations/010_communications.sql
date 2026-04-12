@@ -1,7 +1,7 @@
 -- Migration 010: Communications log
 -- Depends on: contacts, channel_types, orders
 
-CREATE TABLE communications (
+CREATE TABLE IF NOT EXISTS communications (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     contact_id BIGINT UNSIGNED NOT NULL,

@@ -1,7 +1,7 @@
 -- Migration 005: Contact detail tables (phones, emails, addresses)
 -- Depends on: contacts, phone_types, email_types, address_types
 
-CREATE TABLE contact_phones (
+CREATE TABLE IF NOT EXISTS contact_phones (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     contact_id BIGINT UNSIGNED NOT NULL,
     phone_type_id BIGINT UNSIGNED NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE contact_phones (
     CONSTRAINT fk_cp_phone_type FOREIGN KEY (phone_type_id) REFERENCES phone_types(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE contact_emails (
+CREATE TABLE IF NOT EXISTS contact_emails (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     contact_id BIGINT UNSIGNED NOT NULL,
     email_type_id BIGINT UNSIGNED NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE contact_emails (
     CONSTRAINT fk_ce_email_type FOREIGN KEY (email_type_id) REFERENCES email_types(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE contact_addresses (
+CREATE TABLE IF NOT EXISTS contact_addresses (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     contact_id BIGINT UNSIGNED NOT NULL,
     address_type_id BIGINT UNSIGNED NOT NULL,

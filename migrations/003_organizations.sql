@@ -1,7 +1,7 @@
 -- Migration 003: Organizations
 -- Must be created before contacts (contacts.organization_id references this)
 
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     name VARCHAR(255) NOT NULL,

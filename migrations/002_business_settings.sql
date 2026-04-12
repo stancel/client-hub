@@ -1,6 +1,6 @@
 -- Migration 002: Business Settings (singleton config table)
 
-CREATE TABLE business_settings (
+CREATE TABLE IF NOT EXISTS business_settings (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     business_name VARCHAR(255) NOT NULL,
     business_type VARCHAR(100) NULL,

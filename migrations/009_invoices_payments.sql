@@ -1,7 +1,7 @@
 -- Migration 009: Invoices and payments
 -- Depends on: orders, invoice_statuses, payment_methods
 
-CREATE TABLE invoices (
+CREATE TABLE IF NOT EXISTS invoices (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     order_id BIGINT UNSIGNED NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE invoices (
     CONSTRAINT fk_inv_status FOREIGN KEY (invoice_status_id) REFERENCES invoice_statuses(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     invoice_id BIGINT UNSIGNED NOT NULL,

@@ -2,7 +2,7 @@
 -- Sources = which system/integration logged the event (website, cti, chatwoot, etc.)
 -- DISTINCT from marketing_sources = where the lead discovered the business (google, referral, etc.)
 
-CREATE TABLE sources (
+CREATE TABLE IF NOT EXISTS sources (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     code VARCHAR(64) NOT NULL UNIQUE,
@@ -18,7 +18,7 @@ CREATE TABLE sources (
     KEY idx_sources_type (source_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE api_keys (
+CREATE TABLE IF NOT EXISTS api_keys (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     uuid CHAR(36) NOT NULL,
     source_id BIGINT UNSIGNED NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE api_keys (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Seed bootstrap source for existing data and fresh installs
-INSERT INTO sources (uuid, code, name, source_type, description, is_active)
+INSERT IGNORE INTO sources (uuid, code, name, source_type, description, is_active)
 VALUES (UUID(), 'bootstrap', 'Bootstrap Source', 'other',
         'Initial source created by the installer. Rename or create additional sources as needed.',
         TRUE);
