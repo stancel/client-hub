@@ -10,10 +10,13 @@
 - **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
-- **Schema:** 31 tables + 2 views in `dev_schema` (3NF)
-- **API:** 23 endpoint paths, 63 tests passing
+- **Schema:** 34 tables + 3 views in `dev_schema` (3NF)
+- **API:** 28 endpoint paths, 89 tests passing
 - **SDKs:** Python, PHP, TypeScript (auto-generated)
 - **CI/CD:** GitHub Actions (lint → test → build → SDK gen)
+- **Deployment:** one-line installer (`scripts/install.sh`); first
+  production VPS running at
+  `client-hub-complete-dental-care.onlinesalessystems.com`
 
 ### Data Sources That Feed Into Client Hub
 
@@ -63,18 +66,25 @@ The API container runs on `my-main-net` and connects to `mariadb:3306`.
 
 ```
 client-hub/
-├── api/              # FastAPI application (Python 3.12)
-│   ├── app/          # Models, routers, schemas, services
-│   └── tests/        # 63 tests across 13 files
-├── migrations/       # 13 numbered SQL migration files
-├── scripts/          # generate-sdks.sh
-├── sdks/             # Auto-generated Python, PHP, TypeScript SDKs
-├── docs/             # RST documentation
-├── upgrades/         # Pre-upgrade analysis documents
-└── .github/          # CI/CD workflows
+├── api/                                  # FastAPI application (Python 3.12)
+│   ├── app/                              # Models, routers, schemas, services, middleware
+│   └── tests/                            # 89 tests across 17 files
+├── migrations/                           # 17 numbered SQL migrations (001-018, 012 in dev/)
+│   └── dev/                              # Dev/CI-only seed data (012_seed_test_data.sql)
+├── scripts/                              # install.sh, uninstall.sh, bootstrap-migrations.sh,
+│                                         # generate-sdks.sh, smoke-test.sh, cleanup-test-data.sh,
+│                                         # generate-api-key.sh, backup.sh
+├── sdks/                                 # Auto-generated Python, PHP, TypeScript SDKs
+├── docs/                                 # RST documentation (13 files) + handoff prompts
+├── upgrades/                             # Pre-upgrade analysis documents
+├── .github/                              # CI/CD workflows
+├── docker-compose.yml                    # Local Cybertron compose (my-main-net, shared mariadb)
+├── docker-compose.bundled.yml            # Production bundled (API + MariaDB + Caddy with TLS)
+├── docker-compose.bundled-nodomain.yml   # Production bundled (no TLS)
+└── docker-compose.override.yml.example   # OpsInsights cross-DB access example
 ```
 
-## API Endpoints (23 paths)
+## API Endpoints (28 paths)
 
 | Category | Endpoints |
 |---|---|
@@ -87,8 +97,18 @@ client-hub/
 | Communications | List, get, create interaction logs |
 | Webhooks | `POST /api/v1/webhooks/invoiceninja`, `POST /api/v1/webhooks/chatwoot` |
 | Settings | `GET/PUT /api/v1/settings` |
+| Admin | `GET/POST /api/v1/admin/sources`, `GET/PUT/DELETE /api/v1/admin/sources/{uuid}`, source-scoped API key CRUD, `GET /api/v1/admin/events` (root-key-only) |
 
-Auth: `X-API-Key` header on all protected routes.
+Auth: `X-API-Key` header on all protected routes. Multi-source
+model: one root key plus per-source scoped keys. Source attribution
+is auto-stamped on contacts and communications via
+`first_seen_source_id`.
+
+Contact/Organization/Order create/update accept a free-form
+`external_refs_json: dict[str, Any]` field for integration
+metadata (scheduler payloads, Eaglesoft IDs, request headers,
+UTM parameters). See `docs/Cross-Project-Integration.rst` for the
+canonical payload contract.
 
 ## Key Commands
 
@@ -122,6 +142,12 @@ docker exec mariadb mariadb-dump -u root -p dev_schema > backups/dev_$(date +%Y%
 
 # Restore from backup
 docker exec -i mariadb mariadb -u root -p dev_schema < backups/FILENAME.sql
+
+# Provision a new production VPS (one-line installer)
+curl -fsSL https://raw.githubusercontent.com/stancel/client-hub/master/scripts/install.sh | sudo bash
+
+# Smoke test (post-deploy)
+./scripts/smoke-test.sh
 ```
 
 ## Troubleshooting
@@ -169,12 +195,13 @@ docker compose down && docker compose build --no-cache && docker compose up -d
 
 - `v_contact_summary` — Holistic intelligence: lifetime value, order stats, communication stats, marketing sources, tags, opt-outs, outstanding balance
 - `v_contact_last_order` — Last order details per contact: order number, date, status, total, item types
+- `v_events_by_source` — Cross-source event stream for the admin events endpoint, joining contacts/communications/sources with channel and source filters
 
 ## Testing (TDD)
 
 Every API endpoint has a corresponding test. Tests hit the real database.
 
-- **63 tests** across 13 test files
+- **89 tests** across 17 test files
 - Framework: pytest + httpx + AsyncClient
 - Run: `cd api && .venv/bin/python -m pytest tests/ -v`
 - Coverage: `pytest --cov=app --cov-report=term-missing`

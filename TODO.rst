@@ -9,7 +9,8 @@ Client Hub — TODO
 Phase 1 — Data Model Design [COMPLETE]
 ======================================================================
 
-- [x] Design 3NF data model (31 tables + 2 views)
+- [x] Design 3NF data model (initial: 31 tables + 2 views;
+  current after Phases 8–9: 34 tables + 3 views)
 - [x] Document all tables, columns, types, constraints, indexes, FKs
 - [x] Document normalization rationale (1NF, 2NF, 3NF analysis)
 - [x] Document junction tables and why they exist
@@ -25,7 +26,8 @@ Phase 2 — Schema Implementation [COMPLETE]
 ======================================================================
 
 - [x] Create ``migrations/`` directory with numbered SQL files
-- [x] Write DDL for all 31 tables and 2 views (migrations 001-013)
+- [x] Write DDL for all tables and views (migrations 001-018;
+  012 is dev/CI-only seed data relocated to ``migrations/dev/``)
 - [x] Execute all migrations against ``dev_schema`` via MCP tools
 - [x] Verify schema with ``search_objects`` MCP tool
 - [x] Seed lookup tables with initial reference data (58 rows)
@@ -62,7 +64,8 @@ Phase 4 — REST API Design [COMPLETE]
 Phase 5 — API Implementation (TDD) [COMPLETE]
 ======================================================================
 
-63 tests passing across 13 test files, 23 endpoint paths live.
+Initial API: 63 tests / 13 files / 23 endpoint paths.
+Current after Phases 8–10: **89 tests / 17 files / 28 paths**.
 
 - [x] Scaffold API project in ``api/`` directory
 - [x] Set up pytest + httpx test infrastructure with real DB
@@ -71,7 +74,7 @@ Phase 5 — API Implementation (TDD) [COMPLETE]
   orders, invoices, payments, communications, webhooks, settings
 - [x] Add API container to ``docker-compose.yml`` on ``my-main-net``
 - [x] Container running, all endpoints verified with curl
-- [x] OpenAPI spec at ``/openapi.json`` (23 paths)
+- [x] OpenAPI spec at ``/openapi.json`` (28 paths)
 
 .. _client-hub-todo-phase6:
 
@@ -128,6 +131,26 @@ Phase 9 — Post-Deployment Fixes [COMPLETE]
 - [x] Lookup returns all phones/emails (not just matched)
 - [x] Admin events endpoint (GET /admin/events with filters)
 - [x] 82 tests passing
+
+.. _client-hub-todo-phase10:
+
+Phase 10 — external_refs_json Data-Loss Fix [COMPLETE]
+======================================================================
+
+- [x] Pydantic schemas for Contact/Organization/Order now accept
+  ``external_refs_json: dict[str, Any] | None`` (was silently
+  stripped before reaching the service layer)
+- [x] Serialize dict → JSON string on write, defensive
+  ``json.loads`` on read
+- [x] 7 new round-trip tests (89 total; was 82)
+- [x] Round-trip verified on live dental care VPS
+  (commit ``fa6bf2d``)
+- [x] Payload contract documented in
+  ``docs/Cross-Project-Integration.rst``
+- [x] Handoff prompt
+  ``docs/Dental-Care-Payload-Fix-Prompt.rst`` created for the
+  thin-payload + booking.cancelled overwrite issues discovered
+  during verification
 
 .. _client-hub-todo-future:
 

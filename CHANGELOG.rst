@@ -4,6 +4,38 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-11f:
+
+2026-04-11 — Documentation Sync Pass
+======================================================================
+
+End-of-day ``bring-repo-in-sync`` audit. No code changes; updated
+docs to match current reality after Phases 8, 9, and 10 shipped
+in rapid succession.
+
+- ``CLAUDE.md`` — corrected counts (34 tables + 3 views;
+  28 endpoint paths; 89 tests / 17 files; 17 prod migrations +
+  1 dev); added Admin endpoint category (sources, api-keys,
+  events); added note on the ``external_refs_json`` payload
+  contract; expanded directory tree with bundled compose files
+  and all 8 scripts; added ``v_events_by_source`` to views
+  section; added production VPS URL and installer one-liner to
+  Key Commands.
+- ``README.rst`` — same count corrections in Quick Info,
+  architecture diagram, Database Schema section, and Testing
+  section; added Admin endpoint rows to API table; added
+  ``api_keys``, ``sources``, ``_schema_migrations`` to the entity
+  / lookup / system table lists; added ``v_events_by_source``;
+  fully rewrote Project Structure tree to list all current
+  files, directories, scripts, and docs.
+- ``TODO.rst`` — noted current vs. initial counts in Phase 1,
+  2, and 5 (schema grew from 31/2 to 34/3; tests from 63 to 89;
+  paths from 23 to 28); added Phase 10 section for the
+  ``external_refs_json`` fix.
+- Claude Code project memory ``project_vision.md`` — updated
+  phase list through Phase 10, reflected current counts, added
+  notes on live VPS and the payload contract reference.
+
 .. _client-hub-changelog-2026-04-11e:
 
 2026-04-11 — Document external_refs_json Payload Contract

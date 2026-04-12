@@ -51,19 +51,23 @@ Quick Info
    * - **DB Name**
      - ``dev_schema`` (development)
    * - **Schema**
-     - 31 tables + 2 views (3NF normalized)
+     - 34 tables + 3 views (3NF normalized)
    * - **API Endpoints**
-     - 23 paths across 9 routers
+     - 28 paths across 10 routers
    * - **Test Suite**
-     - 63 tests across 13 files
+     - 89 tests across 17 files
    * - **SDKs**
      - Python, PHP, TypeScript (auto-generated from OpenAPI)
    * - **CI/CD**
      - GitHub Actions (lint → test → build → SDK gen)
    * - **MCP Tools**
      - ``apisix-mysql`` (``execute_sql``, ``search_objects``)
+   * - **Production deployment**
+     - First instance live at
+       ``client-hub-complete-dental-care.onlinesalessystems.com``
    * - **Status**
-     - All phases complete. Ready for live integrations.
+     - All phases complete. First live integration running
+       (Complete Dental Care Next.js site).
 
 .. _client-hub-architecture-summary:
 
@@ -86,7 +90,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    ┌─────────────────────────────────────────┐
    │         client-hub-api (FastAPI)        │
    │         Port 8800 on my-main-net       │
-   │    23 endpoints, API key auth          │
+   │    28 endpoints, API key auth          │
    │    Swagger UI at /docs                 │
    └─────────────────┬───────────────────────┘
                      │ SQLAlchemy (async)
@@ -95,7 +99,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    │     Shared MariaDB 12.2.2              │
    │     ~/docker/mariadb/ (port 3306)      │
    │     Database: dev_schema               │
-   │     31 tables + 2 views (3NF)          │
+   │     34 tables + 3 views (3NF)          │
    └─────────────────────────────────────────┘
 
    Also accessible via:
@@ -204,6 +208,14 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
    * - Settings
      - ``GET/PUT /settings``
      - Business configuration
+   * - Admin
+     - ``GET/POST /admin/sources``
+       ``GET/PUT/DELETE /admin/sources/{uuid}``
+       ``GET/POST /admin/sources/{uuid}/api-keys``
+       ``PUT/DELETE /admin/api-keys/{uuid}``
+       ``GET /admin/events``
+     - Source + API key management; cross-source event
+       stream (root-key-only)
 
 .. _client-hub-database-summary:
 
@@ -211,26 +223,32 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
 Database Schema
 **********************************************************************
 
-31 tables + 2 views in ``dev_schema``, normalized to 3NF.
+34 tables + 3 views in ``dev_schema``, normalized to 3NF.
 
-**Entity tables (18):** business_settings, contacts, organizations,
-contact_phones, contact_emails, contact_addresses, org_phones,
-org_emails, org_addresses, contact_channel_prefs,
+**Entity tables (19):** api_keys, business_settings, contacts,
+organizations, contact_phones, contact_emails, contact_addresses,
+org_phones, org_emails, org_addresses, contact_channel_prefs,
 contact_preferences, contact_notes, orders, order_items,
 order_status_history, invoices, payments, communications
 
 **Junction tables (2):** contact_tag_map, contact_marketing_sources
 
-**Lookup tables (11):** contact_types, phone_types, email_types,
+**Lookup tables (12):** contact_types, phone_types, email_types,
 address_types, channel_types, marketing_sources, order_statuses,
-order_item_types, invoice_statuses, payment_methods, tags
+order_item_types, invoice_statuses, payment_methods, tags, sources
 
-**Views (2):**
+**System tables (1):** ``_schema_migrations`` — migration tracking
+(added in migration 018)
+
+**Views (3):**
 
 - ``v_contact_summary`` — Holistic intelligence per contact:
   lifetime value, order stats, communication stats, opt-out flags,
   marketing sources, tags, outstanding balance
 - ``v_contact_last_order`` — Last order details per contact
+- ``v_events_by_source`` — Cross-source event stream joining
+  contacts, communications, sources, and channel types; backs the
+  ``GET /api/v1/admin/events`` endpoint
 
 Full schema documentation: ``docs/data-model.rst``
 
@@ -260,7 +278,7 @@ Testing
 **********************************************************************
 
 Test Driven Development (TDD) — every endpoint has tests.
-63 tests across 13 files, all hitting the real database.
+89 tests across 17 files, all hitting the real database.
 
 .. code-block:: bash
 
@@ -334,43 +352,66 @@ Project Structure
 .. code-block:: text
 
    client-hub/
-   ├── .github/workflows/ci.yml  # GitHub Actions CI pipeline
-   ├── CLAUDE.md                 # Project guidance for Claude Code
-   ├── README.rst                # This file
-   ├── CHANGELOG.rst             # Chronological change log
-   ├── TODO.rst                  # Task tracking
-   ├── docker-compose.yml        # API container on my-main-net
-   ├── .env                      # Environment variables (git-ignored)
-   ├── .env.example              # Template for .env
+   ├── .github/workflows/ci.yml              # GitHub Actions CI pipeline
+   ├── CLAUDE.md                             # Project guidance for Claude Code
+   ├── README.rst                            # This file
+   ├── CHANGELOG.rst                         # Chronological change log
+   ├── TODO.rst                              # Task tracking
+   ├── Caddyfile                             # Reverse proxy config for bundled TLS deploy
+   ├── docker-compose.yml                    # Local Cybertron compose (shared mariadb)
+   ├── docker-compose.bundled.yml            # Production bundled (API + MariaDB + Caddy TLS)
+   ├── docker-compose.bundled-nodomain.yml   # Production bundled (no TLS)
+   ├── docker-compose.override.yml.example   # OpsInsights cross-DB access example
+   ├── .env                                  # Environment variables (git-ignored)
+   ├── .env.example                          # Template for .env
    ├── .gitignore
-   ├── api/                      # FastAPI application
+   ├── api/                                  # FastAPI application
    │   ├── Dockerfile
    │   ├── requirements.txt
    │   ├── ruff.toml
    │   ├── pytest.ini
-   │   ├── app/                  # Application code
+   │   ├── app/                              # Application code
    │   │   ├── main.py
    │   │   ├── config.py
    │   │   ├── database.py
-   │   │   ├── models/           # SQLAlchemy ORM models
-   │   │   ├── schemas/          # Pydantic request/response
-   │   │   ├── routers/          # Endpoint handlers
-   │   │   ├── services/         # Business logic
-   │   │   └── middleware/       # Auth
-   │   └── tests/                # 63 tests, 13 files
-   ├── migrations/               # 13 numbered SQL files
-   ├── scripts/
-   │   └── generate-sdks.sh      # SDK generation script
-   ├── sdks/                     # Auto-generated client SDKs
+   │   │   ├── models/                       # SQLAlchemy ORM models
+   │   │   ├── schemas/                      # Pydantic request/response
+   │   │   ├── routers/                      # Endpoint handlers (10 routers)
+   │   │   ├── services/                     # Business logic
+   │   │   └── middleware/                   # API key auth (root + source-scoped)
+   │   └── tests/                            # 89 tests, 17 files
+   ├── migrations/                           # 17 numbered SQL files (001-018)
+   │   └── dev/                              # Dev/CI-only seed data
+   │       └── 012_seed_test_data.sql
+   ├── scripts/                              # 8 shell scripts
+   │   ├── install.sh                        # One-line production installer
+   │   ├── uninstall.sh                      # Preserves .env + install summary
+   │   ├── bootstrap-migrations.sh           # First-run migration runner
+   │   ├── generate-sdks.sh                  # SDK generation (Python/PHP/TS)
+   │   ├── generate-api-key.sh               # Create source-scoped API keys
+   │   ├── smoke-test.sh                     # Post-install smoke test
+   │   ├── cleanup-test-data.sh              # Strip seed data from contaminated prod
+   │   └── backup.sh                         # Database backup helper
+   ├── sdks/                                 # Auto-generated client SDKs
+   │   ├── openapi.json                      # Cached OpenAPI spec
    │   ├── python/
    │   ├── php/
    │   └── typescript/
-   ├── docs/                     # RST documentation
+   ├── docs/                                 # RST documentation (13 files)
    │   ├── architecture.rst
    │   ├── data-model.rst
    │   ├── api-design.rst
-   │   └── ci-cd.rst
-   └── upgrades/                 # Pre-upgrade analysis docs
+   │   ├── ci-cd.rst
+   │   ├── Multi-Source.rst
+   │   ├── Deployment.rst
+   │   ├── Upgrade.rst
+   │   ├── Data-Privacy.rst
+   │   ├── Cross-Project-Integration.rst
+   │   ├── Installation-Implementation-Prompt.rst
+   │   ├── Post-Deployment-Fixes-Prompt.rst
+   │   ├── External-Refs-Json-Fix-Prompt.rst
+   │   └── Dental-Care-Payload-Fix-Prompt.rst
+   └── upgrades/                             # Pre-upgrade analysis docs
 
 .. _client-hub-references:
 
