@@ -4,6 +4,56 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-18a:
+
+2026-04-18 — OpsInsights SaaS Connection: Direct MySQL/TLS + IP Allowlist
+==========================================================================
+
+First real SaaS-integration pattern proven end-to-end against the
+live Clever Orchid Client Hub VPS (``client-hub.cleverorchid.com``
+/ ``165.245.130.39``). Two reusable integration plans documented,
+one automation script written, first customer onboarded.
+
+- New doc ``docs/OpsInsights-Direct-TLS-Plan.rst`` — the chosen
+  connection pattern: MariaDB published on 3306 with a Let's
+  Encrypt TLS cert (acquired via Caddy for a second vhost), iptables
+  DOCKER-USER chain restricts inbound to the two OpsInsights exit
+  IPs (``52.72.248.4`` / ``52.207.33.249``), read-only MariaDB user
+  per customer. Full "As Implemented" section documents the actual
+  deployed state on Clever Orchid, including the two production
+  deviations: global ``require_secure_transport`` not set (would
+  break the internal FastAPI connection), and ``REQUIRE SSL`` on
+  the user was dropped at runtime because OpsInsights cannot
+  negotiate TLS on MySQL connections due to a bug in its hardcoded
+  ADOdb PDO driver. See the Deviation section for the full bug
+  writeup and the two-line patch for the future OpsInsights
+  modernization pass.
+- New doc ``docs/OpsInsights-SSH-Tunnel-Plan.rst`` — the alternative
+  integration pattern for read/write enrichment work. Preserved as
+  a reference plan for when CTI ingest and InvoiceNinja join
+  workflows need to write back to Client Hub. Not implemented yet.
+- New doc ``docs/OpsInsights-Setup-Prompt.rst`` — the Knowledge
+  Transfer prompt for future customer onboarding. Explains what the
+  setup script does and why, prerequisites, run invocation,
+  verification procedure on both sides, operational notes (cert
+  renewal, rotation, revert), and the security model with
+  compromise scenarios. Written so a fresh Claude Code session
+  opened in ``/opt/client-hub/`` can execute the work end-to-end.
+- New script ``scripts/setup-opsinsights-tls.sh`` — parameterized,
+  idempotent automation of the whole flow. Adds the Caddyfile vhost,
+  waits for ACME, stages the cert, patches
+  ``docker-compose.bundled.yml`` for the 3306 publish + TLS mount,
+  installs ``iptables-persistent`` and adds ``DOCKER-USER`` allow
+  rules, recreates the MariaDB container, creates the read-only
+  user, writes and emits credentials. Flags: ``--hostname``,
+  ``--allow-ip`` (repeatable), ``--install-dir``, ``--mariadb-user``,
+  ``--require-ssl`` (opt-in; default off pending OpsInsights fix),
+  ``--rotate-password``, ``--dry-run``, ``--non-interactive``.
+- First production customer: Clever Orchid Embroidery. 11 contacts
+  / 13 communications as of onboarding. OpsInsights SaaS dashboard
+  integration pending verification (the user retries the connection
+  on the OpsInsights side before this commit is pushed).
+
 .. _client-hub-changelog-2026-04-11f:
 
 2026-04-11 — Documentation Sync Pass
