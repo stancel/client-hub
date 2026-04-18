@@ -2,13 +2,15 @@
 OpsInsights → Client Hub: Direct MySQL over TLS + IP Allowlist
 ======================================================================
 
-:Status: IMPLEMENTED for Clever Orchid on 2026-04-18. **Two
-         deviations from plan in production** — global
-         ``require_secure_transport`` not set (would break internal
-         API), and ``REQUIRE SSL`` on the user was dropped at
-         runtime because OpsInsights cannot negotiate TLS (known
-         bug in their hardcoded ADOdb PDO driver). See "As
-         implemented" section for full details.
+:Status: IMPLEMENTED and FULLY VERIFIED for Clever Orchid on
+         2026-04-18. ``REQUIRE SSL`` is in force on
+         ``opsinsights_ro`` and every observed production
+         connection from OpsInsights (52.207.33.249, AWS NAT
+         Gateway) negotiates TLS correctly. One intentional
+         deviation from the original plan held: global
+         ``require_secure_transport`` is not set, because the
+         internal FastAPI container connects over plaintext on the
+         Docker network and would break.
 :Use case: Persistent, low-latency, read-only access from the
            OpsInsights SaaS backend to each customer Client Hub's
            MariaDB. Feeds live dashboards.
@@ -27,8 +29,8 @@ whitelist IP addresses" section.
 
 The OpsInsights SaaS has two stable egress IPs:
 
-- ``52.72.248.4`` — AWS NAT Gateway, all application traffic
-- ``52.207.33.249`` — OpenVPN server, manual/operator traffic
+- ``52.207.33.249`` — AWS NAT Gateway, production SaaS application traffic
+- ``52.72.248.4`` — OpenVPN server, operator / manual access
 
 OpsInsights enforces SSL on the client side, so MariaDB must be
 reachable over TLS (self-signed acceptable; publicly-trusted cert
@@ -214,8 +216,9 @@ Verification
        nc -zv client-hub.cleverorchid.com 3306
        # expect: connection refused / timeout (DROP in DOCKER-USER)
 
-4. **From OpsInsights SaaS** (52.72.248.4 egress): Brad will test
-   the dashboard hookup with the handed-off credentials.
+4. **From OpsInsights SaaS** (``52.207.33.249`` NAT Gateway
+   egress): Brad tests the dashboard hookup with the handed-off
+   credentials.
 
 5. **Read-only verified**::
 
@@ -371,10 +374,10 @@ tls.sh`` + systemd timer (or Caddy ``exec`` directive on the
 renewal hook) to automate this. Until that's in place, schedule a
 monthly manual refresh or set a reminder for mid-June 2026.
 
-.. _require-ssl-dropped-interim:
+.. _require-ssl-history:
 
-Deviation — REQUIRE SSL dropped (interim, 2026-04-18)
-----------------------------------------------------------------------
+History — REQUIRE SSL dropped briefly, then restored after the OpsInsights fix
+------------------------------------------------------------------------------
 
 Initial deployment created the user with ``REQUIRE SSL``. During
 end-to-end verification, OpsInsights could not negotiate TLS on
@@ -397,27 +400,34 @@ meanwhile ``use_persistent_connection`` is a separate column on
 and UI are correctly designed; only the connect method is wired
 to the wrong column.
 
-**Interim decision:** Drop ``REQUIRE SSL`` from the
-``opsinsights_ro`` user on the Clever Orchid Client Hub host
-(``ALTER USER 'opsinsights_ro'@'%' REQUIRE NONE``). Security now
-rests on:
+**Interim action (2026-04-18, mid-afternoon):** Dropped
+``REQUIRE SSL`` from the ``opsinsights_ro`` user
+(``ALTER USER 'opsinsights_ro'@'%' REQUIRE NONE``) so the SaaS
+could connect at all. Security rested on the iptables
+``DOCKER-USER`` allowlist + MariaDB auth + read-only grants
+during this window. Plaintext traffic flowed between AWS NAT
+Gateway and DigitalOcean for the duration.
 
-- iptables ``DOCKER-USER`` allowlist (only ``52.72.248.4`` and
-  ``52.207.33.249`` can reach port 3306)
-- MariaDB auth (32-char random password)
-- ``SELECT``-only grants on ``clienthub``
+**Resolution (2026-04-18, evening):** Brad patched the ADOdb PDO
+driver in OpsInsights, deployed to production, and verified
+end-to-end against this Client Hub. The MariaDB general log
+captured 10 TLS-encrypted connections from OpsInsights egress IPs
+during verification (7 from ``52.207.33.249`` AWS NAT Gateway,
+the production SaaS path; 3 from ``52.72.248.4`` OpenVPN
+operator-access path — Brad originally had these IP roles labeled
+reversed and corrected them after observing live traffic). Zero
+plaintext attempts from OpsInsights since the patch. Brad
+confirmed the posture by disabling SSL client-side — the
+connection was correctly rejected, proving ``REQUIRE SSL`` is in
+force.
 
-Plaintext traffic flows between AWS NAT Gateway and DigitalOcean —
-MITM on Tier-1 backbone is very unlikely but not zero.
+``REQUIRE SSL`` was re-added after verification
+(``ALTER USER 'opsinsights_ro'@'%' REQUIRE SSL``). Full defense-
+in-depth restored.
 
-**Revisit during the OpsInsights modernization pass** (Greptile +
-Claude Code). At that point: apply the two patches documented in
-the memory note ``project_opsinsights_adodb_pdo_ssl_bug.md`` and
-then re-add ``REQUIRE SSL`` to restore full defense-in-depth. Also
-adjust the script default at that time.
-
-For **new Client Hub deployments** before the OpsInsights fix is
-in, use ``scripts/setup-opsinsights-tls.sh`` without
-``--require-ssl`` (the default). After the OpsInsights fix ships,
-update the script default and pass ``--require-ssl`` at deploy
-time.
+**For new Client Hub deployments going forward:** use
+``scripts/setup-opsinsights-tls.sh`` with default settings — the
+script now defaults to ``REQUIRE SSL`` on. The ``--no-require-ssl``
+flag is only needed if you're onboarding against an OpsInsights
+environment that predates this fix (unlikely for any future
+customer).

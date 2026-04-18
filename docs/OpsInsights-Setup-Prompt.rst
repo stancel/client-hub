@@ -68,8 +68,8 @@ Before running the script, ensure:
 - **You have the target IPs** that need to reach MariaDB. For
   OpsInsights this is::
 
-      52.72.248.4     (AWS NAT Gateway, application traffic)
-      52.207.33.249   (OpenVPN server, manual operator traffic)
+      52.207.33.249   (AWS NAT Gateway, production SaaS application traffic)
+      52.72.248.4     (OpenVPN server, operator / manual access)
 
   These are documented at
   https://connect.opsinsights.com/instructions/index.html
@@ -144,19 +144,16 @@ and one-or-more allowed IPs, it:
 6. **Creates the read-only MariaDB user** ``opsinsights_ro`` (or the
    name passed via ``--mariadb-user``)::
 
-       CREATE USER 'opsinsights_ro'@'%' IDENTIFIED BY '<32-char>';
+       CREATE USER 'opsinsights_ro'@'%' IDENTIFIED BY '<32-char>' REQUIRE SSL;
        GRANT SELECT ON <DB_NAME>.* TO 'opsinsights_ro'@'%';
 
-   By default, **no** ``REQUIRE SSL`` clause is added — as of 2026-04
-   OpsInsights cannot negotiate TLS on its MySQL connection due to a
-   hardcoded-ADOdb bug (see ``OpsInsights-Direct-TLS-Plan.rst``). The
-   IP allowlist from step 4 + MariaDB auth + read-only grants are
-   the primary security boundary in this interim mode. Once the
-   OpsInsights ADOdb bug is patched, re-run the script with
-   ``--require-ssl`` (or manually ``ALTER USER ... REQUIRE SSL``) to
-   restore full defense-in-depth. If the user already exists, the
-   script keeps the existing password unless ``--rotate-password``
-   is passed.
+   ``REQUIRE SSL`` is added by default as of the 2026-04-18 script
+   update — this became safe after the OpsInsights ADOdb PDO SSL
+   fix was deployed to production and verified against the Clever
+   Orchid Client Hub. Pass ``--no-require-ssl`` only if you're
+   onboarding against an OpsInsights environment that predates
+   that patch. If the user already exists, the script keeps the
+   existing password unless ``--rotate-password`` is passed.
 
 7. **Writes credentials** to
    ``/opt/client-hub/data/opsinsights_credentials.txt`` (mode 0600,
@@ -164,10 +161,9 @@ and one-or-more allowed IPs, it:
    them into OpsInsights.
 
 8. **Verifies** — logs in as ``opsinsights_ro`` over TLS (must
-   succeed). The non-TLS behavior depends on whether
-   ``--require-ssl`` was passed: without the flag (default / interim
-   mode), plaintext login must succeed; with the flag, plaintext
-   login must be rejected.
+   succeed). By default (``REQUIRE SSL`` on), a plaintext login
+   must be rejected with ``ERROR 1045``. With ``--no-require-ssl``,
+   a plaintext login must succeed.
 
 
 **********************************************************************
@@ -179,16 +175,20 @@ On the Client Hub VPS, as root::
     cd /opt/client-hub
     sudo ./scripts/setup-opsinsights-tls.sh \
         --hostname client-hub.<customer-domain> \
-        --allow-ip 52.72.248.4 \
-        --allow-ip 52.207.33.249
+        --allow-ip 52.207.33.249 \
+        --allow-ip 52.72.248.4
+
+Note: ``52.207.33.249`` is the AWS NAT Gateway (production SaaS
+traffic) and ``52.72.248.4`` is the OpenVPN server (operator /
+manual access).
 
 If Client Hub is installed in a non-default location::
 
     sudo ./scripts/setup-opsinsights-tls.sh \
         --install-dir /srv/client-hub \
         --hostname client-hub.<customer-domain> \
-        --allow-ip 52.72.248.4 \
-        --allow-ip 52.207.33.249
+        --allow-ip 52.207.33.249 \
+        --allow-ip 52.72.248.4
 
 To preview without changing anything::
 
@@ -200,11 +200,13 @@ To rotate the password for an existing ``opsinsights_ro`` user::
     sudo ./scripts/setup-opsinsights-tls.sh \
         --hostname ... --allow-ip ... --rotate-password
 
-Once OpsInsights is patched to support TLS on MySQL connections,
-add ``--require-ssl`` to restore full defense-in-depth::
+If you're onboarding against an older OpsInsights environment that
+predates the 2026-04-18 ADOdb PDO SSL fix, pass
+``--no-require-ssl`` to skip the ``REQUIRE SSL`` clause on the
+user::
 
     sudo ./scripts/setup-opsinsights-tls.sh \
-        --hostname ... --allow-ip ... --rotate-password --require-ssl
+        --hostname ... --allow-ip ... --no-require-ssl
 
 
 **********************************************************************

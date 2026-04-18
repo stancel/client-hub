@@ -22,14 +22,12 @@
 #      all other sources are DROPped. IPv6 gets a blanket DROP on 3306.
 #   5. Recreates the MariaDB container to pick up the compose changes.
 #   6. Creates (or rotates with --rotate-password) a read-only MariaDB user
-#      'opsinsights_ro' with SELECT on ${DB_NAME}. By default the user is
-#      created WITHOUT 'REQUIRE SSL' because OpsInsights as of 2026-04 can
-#      not negotiate TLS on its MySQL connection (bug in its hardcoded ADOdb
-#      PDO driver — see docs/OpsInsights-Direct-TLS-Plan.rst and the memory
-#      note project_opsinsights_adodb_pdo_ssl_bug.md). Pass --require-ssl
-#      to add REQUIRE SSL once OpsInsights is modernized. The firewall
-#      allowlist + read-only grants remain the primary security boundary
-#      either way.
+#      'opsinsights_ro' with SELECT on ${DB_NAME} and REQUIRE SSL. The
+#      OpsInsights ADOdb PDO SSL bug was fixed and deployed to production on
+#      2026-04-18 and verified end-to-end against the Clever Orchid Client
+#      Hub, so REQUIRE SSL is now the default. Pass --no-require-ssl ONLY if
+#      you're onboarding against an OpsInsights environment that doesn't yet
+#      have the ADOdb patch deployed.
 #   7. Writes the credentials to ./data/opsinsights_credentials.txt (0600,
 #      root) and prints them to stdout.
 #
@@ -46,10 +44,11 @@
 # Optional:
 #   --install-dir /opt/client-hub       (default shown)
 #   --mariadb-user opsinsights_ro       (default)
-#   --require-ssl                       (add REQUIRE SSL clause to the
-#                                        user — enable this once the
-#                                        OpsInsights ADOdb PDO SSL bug
-#                                        is fixed)
+#   --no-require-ssl                    (skip the REQUIRE SSL clause on the
+#                                        user — only use if the target
+#                                        OpsInsights environment is on a
+#                                        build that predates the 2026-04-18
+#                                        ADOdb PDO SSL fix)
 #   --rotate-password                   (generate a new password even if
 #                                        the user already exists)
 #   --dry-run                           (print what would happen, change
@@ -65,7 +64,7 @@ INSTALL_DIR="/opt/client-hub"
 HOSTNAME=""
 ALLOW_IPS=()
 MARIADB_USER="opsinsights_ro"
-REQUIRE_SSL=false
+REQUIRE_SSL=true
 ROTATE_PASSWORD=false
 DRY_RUN=false
 NON_INTERACTIVE=false
@@ -99,7 +98,8 @@ while [[ $# -gt 0 ]]; do
         --allow-ip)          ALLOW_IPS+=("$2"); shift 2 ;;
         --install-dir)       INSTALL_DIR="$2"; shift 2 ;;
         --mariadb-user)      MARIADB_USER="$2"; shift 2 ;;
-        --require-ssl)       REQUIRE_SSL=true; shift ;;
+        --require-ssl)       REQUIRE_SSL=true; shift ;;   # back-compat: still accepted
+        --no-require-ssl)    REQUIRE_SSL=false; shift ;;
         --rotate-password)   ROTATE_PASSWORD=true; shift ;;
         --dry-run)           DRY_RUN=true; shift ;;
         --non-interactive)   NON_INTERACTIVE=true; shift ;;
@@ -380,7 +380,7 @@ if [[ "$USER_EXISTS" -eq 0 ]] || $ROTATE_PASSWORD; then
         log "Creating/rotating user with new 32-char password and REQUIRE SSL."
     else
         REQUIRE_CLAUSE="REQUIRE NONE"
-        log "Creating/rotating user with new 32-char password. REQUIRE SSL NOT set — IP allowlist is the primary security boundary. Pass --require-ssl once OpsInsights can negotiate TLS (see OpsInsights-Direct-TLS-Plan.rst)."
+        log "Creating/rotating user with new 32-char password. REQUIRE SSL NOT set (--no-require-ssl passed) — only use this if the target OpsInsights environment predates the 2026-04-18 ADOdb PDO SSL fix. IP allowlist is the primary security boundary either way."
     fi
 
     if ! $DRY_RUN; then
@@ -416,7 +416,7 @@ Port:      3306
 Database:  $DB_NAME
 User:      $MARIADB_USER
 Password:  $OPS_PASS
-$(if $REQUIRE_SSL; then echo "SSL:       REQUIRED on user (Let's Encrypt cert, publicly trusted)"; else echo "SSL:       offered by server but NOT required on user (interim — see docs/OpsInsights-Direct-TLS-Plan.rst)"; fi)
+$(if $REQUIRE_SSL; then echo "SSL:       REQUIRED on user (Let's Encrypt cert, publicly trusted)"; else echo "SSL:       offered by server but NOT required on user (--no-require-ssl — OpsInsights env predates the 2026-04-18 ADOdb fix)"; fi)
 
 Firewall whitelist (iptables DOCKER-USER):
 $(for ip in "${ALLOW_IPS[@]}"; do echo "  $ip"; done)
@@ -454,11 +454,11 @@ if ! $DRY_RUN; then
                 warn "Non-TLS connection was NOT rejected — REQUIRE SSL clause not working."
             fi
         else
-            # Non-TLS should work when REQUIRE SSL is off (interim mode)
+            # Non-TLS should work when REQUIRE SSL is off (--no-require-ssl mode)
             if docker exec clienthub-mariadb mariadb \
                    -h127.0.0.1 --ssl=0 -u"$MARIADB_USER" -p"$OPS_PASS" \
                    "$DB_NAME" -e "SELECT 1;" 2>&1 | grep -q "^1$"; then
-                log "Non-TLS connection succeeded (interim mode — REQUIRE SSL not set)."
+                log "Non-TLS connection succeeded (--no-require-ssl mode)."
             else
                 warn "Non-TLS connection failed unexpectedly — check MariaDB config."
             fi

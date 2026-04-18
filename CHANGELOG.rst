@@ -4,6 +4,45 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-18b:
+
+2026-04-18 — OpsInsights TLS Fix Verified; Script Defaults to REQUIRE SSL
+==========================================================================
+
+Follow-up to the morning's 2026-04-18a entry. Between then and the end
+of the day, Brad patched the OpsInsights ADOdb PDO SSL bug, deployed to
+production, and verified the fix end-to-end against the Clever Orchid
+Client Hub. The MariaDB general log captured 10+ TLS-encrypted
+connections from OpsInsights egress IPs across both the production
+SaaS path (``52.207.33.249``, AWS NAT Gateway) and the operator path
+(``52.72.248.4``, OpenVPN) with zero plaintext attempts. ``REQUIRE SSL``
+has been restored on the ``opsinsights_ro`` user. Full defense-in-depth
+(IP allowlist + TLS + MariaDB auth + read-only grants) is back in force.
+
+Script + docs updated to reflect the new reality:
+
+- ``scripts/setup-opsinsights-tls.sh`` — ``REQUIRE_SSL`` default flipped
+  from ``false`` to ``true``. Flag renamed: ``--require-ssl`` now a no-op
+  (kept for back-compat); new ``--no-require-ssl`` for the rare case of
+  onboarding against an older OpsInsights build. Verification step
+  inverted accordingly — plaintext login must now be REJECTED in the
+  default path.
+- ``docs/OpsInsights-Direct-TLS-Plan.rst`` — Status line updated from
+  "deviations from plan" to "fully verified". Old "Deviation — REQUIRE
+  SSL dropped (interim)" section renamed to "History" and rewritten as
+  a chronological narrative (interim drop → fix deployed → REQUIRE SSL
+  restored → verified by client-side SSL-off test).
+- ``docs/OpsInsights-Setup-Prompt.rst`` — Default run invocation no
+  longer carries an interim caveat. Flag description inverted. Added
+  an IP-role note (``52.207.33.249`` = NAT Gateway, ``52.72.248.4`` =
+  OpenVPN) — these were originally labeled reversed in Brad's
+  ``connect.opsinsights.com`` public docs, corrected after live
+  traffic observation.
+- IP role labels corrected throughout all three RST docs.
+
+Clever Orchid Client Hub connection is now production-ready and fully
+encrypted in transit. First customer Client Hub deployment closed out.
+
 .. _client-hub-changelog-2026-04-18a:
 
 2026-04-18 — OpsInsights SaaS Connection: Direct MySQL/TLS + IP Allowlist
