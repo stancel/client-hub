@@ -4,6 +4,32 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-22:
+
+2026-04-22 — README: Prominent One-Line Installer Section
+==========================================================================
+
+The one-line ``curl | sudo bash`` installer (``scripts/install.sh``,
+shipped in Phase 8) was discoverable only from ``CLAUDE.md`` and the
+``docs/Deployment.rst`` guide — there was no mention in ``README.rst``,
+which is the first thing anyone provisioning a new VPS looks at. Fixed.
+
+- ``README.rst`` — New **One-Line Installer** chapter placed directly
+  after the Overview (above Quick Info) so it is the first actionable
+  thing after the project intro. Includes the interactive one-liner,
+  the non-interactive form with all flags, and a flag reference table
+  (``--mode``, ``--domain``, ``--admin-email``, ``--first-source-code``,
+  ``--first-source-name``, ``--sdks``, ``--include-seed-data``,
+  ``--install-dir``, ``--non-interactive``). Points to
+  ``scripts/smoke-test.sh`` for post-install verification and
+  ``docs/Deployment.rst`` for the full guide.
+- Fixed stray "Embro idery" typo in the Overview paragraph.
+- ``rstcheck --report-level warning README.rst`` — clean.
+
+Installer URL still pointing at
+``raw.githubusercontent.com/stancel/client-hub/master/scripts/install.sh``
+per Brad — the repo will move eventually but not yet.
+
 .. _client-hub-changelog-2026-04-18b:
 
 2026-04-18 — OpsInsights TLS Fix Verified; Script Defaults to REQUIRE SSL

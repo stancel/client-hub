@@ -27,6 +27,69 @@ business (single-tenant).
 
 **GitHub:** https://github.com/stancel/client-hub
 
+.. _client-hub-one-line-installer:
+
+**********************************************************************
+One-Line Installer
+**********************************************************************
+
+Provision a production VPS in a single command. Installs Docker,
+clones the repo to ``/opt/client-hub``, runs migrations, and (in
+bundled mode) brings up the API, MariaDB, and Caddy with automatic
+Let's Encrypt TLS.
+
+**Interactive (recommended for first-time installs):**
+
+.. code-block:: bash
+
+   curl -fsSL https://raw.githubusercontent.com/stancel/client-hub/master/scripts/install.sh | sudo bash
+
+**Non-interactive (scripted / CI):**
+
+.. code-block:: bash
+
+   curl -fsSL https://raw.githubusercontent.com/stancel/client-hub/master/scripts/install.sh | sudo bash -s -- \
+     --mode bundled \
+     --domain client-hub.example.com \
+     --admin-email admin@example.com \
+     --first-source-code my_website \
+     --first-source-name "My Website" \
+     --sdks typescript \
+     --non-interactive
+
+**Installer flags:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Flag
+     - Purpose
+   * - ``--mode``
+     - ``bundled`` (API + MariaDB + Caddy TLS) or
+       ``bundled-nodomain`` (no TLS, IP-only)
+   * - ``--domain``
+     - Public hostname for the API (required for TLS)
+   * - ``--admin-email``
+     - Contact email for Let's Encrypt certificates
+   * - ``--first-source-code``
+     - Code for the first data source (e.g. ``my_website``)
+   * - ``--first-source-name``
+     - Human-readable name for the first data source
+   * - ``--sdks``
+     - Which SDK to generate post-install
+       (``python``, ``php``, ``typescript``, or ``none``)
+   * - ``--include-seed-data``
+     - Seed dev/test data (omit for production)
+   * - ``--install-dir``
+     - Override install path (default: ``/opt/client-hub``)
+   * - ``--non-interactive``
+     - Skip prompts; use flags/defaults only
+
+After install, verify with ``./scripts/smoke-test.sh``. See
+``docs/Deployment.rst`` for the full deployment guide and
+``scripts/install.sh`` for the complete source.
+
 .. _client-hub-quick-info:
 
 **********************************************************************
