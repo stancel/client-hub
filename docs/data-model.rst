@@ -322,10 +322,6 @@ type (client, prospect, lead, vendor) is determined by
      - BIGINT UNSIGNED
      - NO
      - FK → contact_types.id
-   * - organization_id
-     - BIGINT UNSIGNED
-     - YES
-     - FK → organizations.id
    * - first_name
      - VARCHAR(100)
      - NO
@@ -399,7 +395,6 @@ type (client, prospect, lead, vendor) is determined by
 
 - ``idx_contacts_uuid`` on ``uuid`` (UNIQUE)
 - ``idx_contacts_type`` on ``contact_type_id``
-- ``idx_contacts_org`` on ``organization_id``
 - ``idx_contacts_name`` on ``last_name, first_name``
 - ``idx_contacts_enrichment`` on ``enrichment_status``
 - ``idx_contacts_active`` on ``is_active``
@@ -411,6 +406,19 @@ about the contact, not a transitive dependency. ``external_refs_json``
 stores integration IDs that are opaque to this schema; normalizing
 these into a separate table would add complexity without benefit since
 they are only used for exact-match lookups by the API layer.
+
+**Organization affiliation (migration 021):** Prior to migration 021
+``contacts`` carried a single nullable ``organization_id`` FK. That
+column modeled a contact as belonging to at most one organization,
+which is wrong for real-world data (a dental hygienist may work at
+two practices; a household contact may be reachable via a shared
+employer). That FK was a denormalized cached pointer duplicating a
+fact better expressed via a junction, and was dropped in migration
+021. Contact-to-organization relationships now live in
+``contact_org_affiliations`` (see below), with ``is_primary=1`` on
+the row representing the contact's primary affiliation. All
+historical data was migrated from the old column to one
+``is_primary=1`` junction row per non-NULL value in migration 019.
 
 .. _client-hub-dm-organizations:
 
@@ -482,6 +490,199 @@ can belong to.
 - ``idx_orgs_uuid`` on ``uuid`` (UNIQUE)
 - ``idx_orgs_name`` on ``name``
 
+.. _client-hub-dm-seniority-levels:
+
+seniority_levels
+======================================================================
+
+Lookup table for affiliation seniority. Introduced in migration 019
+alongside ``contact_org_affiliations``. Matches the pattern of other
+lookup tables (``contact_types``, ``phone_types``, etc.) rather than
+storing seniority as a free-text string or ENUM, because 3NF requires
+that categorical attributes with a fixed vocabulary live in their own
+table.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 10 45
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - id
+     - BIGINT UNSIGNED AUTO_INCREMENT
+     - NO
+     - PK
+   * - code
+     - VARCHAR(50)
+     - NO
+     - UNIQUE. e.g., ``exec``, ``senior``, ``mid``, ``junior``,
+       ``intern``, ``unknown``
+   * - label
+     - VARCHAR(100)
+     - NO
+     - Display name (e.g., ``Executive / C-Suite``)
+   * - sort_order
+     - INT UNSIGNED
+     - NO
+     - DEFAULT 0. For ordered display.
+   * - is_active
+     - BOOLEAN
+     - NO
+     - DEFAULT TRUE
+   * - created_at
+     - DATETIME
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP
+
+**Indexes:**
+
+- ``ux_seniority_code`` on ``code`` (UNIQUE)
+
+**Seed values (migration 011 extension via 019):** ``exec``,
+``senior``, ``mid``, ``junior``, ``intern``, ``unknown``.
+
+.. _client-hub-dm-contact-org-affiliations:
+
+contact_org_affiliations
+======================================================================
+
+Junction table modeling the many-to-many relationship between
+contacts and organizations, with per-affiliation metadata. Introduced
+in migration 019. Replaces the dropped ``contacts.organization_id``
+FK (removed in migration 021).
+
+A contact can have many affiliations (a hygienist who works two days
+at Practice A and three days at Practice B). An organization has
+many affiliated contacts (staff, vendors, household members). Each
+affiliation row carries attributes that belong to the *relationship*,
+not to either side alone: job title, department, seniority, whether
+this contact is a decision-maker for the organization, whether this
+is the contact's primary affiliation, employment start/end dates.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 10 45
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - id
+     - BIGINT UNSIGNED AUTO_INCREMENT
+     - NO
+     - PK
+   * - uuid
+     - CHAR(36)
+     - NO
+     - UNIQUE, for external/API use
+   * - contact_id
+     - BIGINT UNSIGNED
+     - NO
+     - FK → contacts.id ON DELETE CASCADE
+   * - organization_id
+     - BIGINT UNSIGNED
+     - NO
+     - FK → organizations.id ON DELETE CASCADE
+   * - role_title
+     - VARCHAR(200)
+     - YES
+     - Free-text job title (e.g., ``Hygienist``, ``VP of Sales``,
+       ``Office Manager``)
+   * - department
+     - VARCHAR(100)
+     - YES
+     - Free-text department name (intentionally not a lookup —
+       departments are org-specific vocabulary, not a shared
+       category system)
+   * - seniority_level_id
+     - BIGINT UNSIGNED
+     - YES
+     - FK → seniority_levels.id
+   * - is_decision_maker
+     - BOOLEAN
+     - NO
+     - DEFAULT FALSE. TRUE if this contact has decision authority
+       within this organization (budget, vendor selection, etc.)
+   * - is_primary
+     - BOOLEAN
+     - NO
+     - DEFAULT FALSE. TRUE on the contact's primary affiliation.
+       At most one row per ``contact_id`` may be TRUE
+       (enforced by generated-column unique index).
+   * - is_primary_key
+     - TINYINT UNSIGNED
+     - YES
+     - Generated column: ``GENERATED ALWAYS AS (IF(is_primary, 1,
+       NULL)) VIRTUAL``. Used to enforce the single-primary
+       invariant via a composite UNIQUE index on
+       ``(contact_id, is_primary_key)``. NULL values do not count
+       toward uniqueness in InnoDB/MariaDB, so non-primary rows
+       are unconstrained while at most one row may be primary.
+   * - start_date
+     - DATE
+     - YES
+     - When the affiliation began
+   * - end_date
+     - DATE
+     - YES
+     - When the affiliation ended. NULL = current/active.
+   * - is_active
+     - BOOLEAN
+     - NO
+     - DEFAULT TRUE. Soft-delete flag, independent of date window.
+   * - notes_text
+     - TEXT
+     - YES
+     - Free-text notes about this specific affiliation
+   * - external_refs_json
+     - JSON
+     - YES
+     - Per-affiliation integration IDs (e.g., HRIS employee ID)
+   * - created_at
+     - DATETIME
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP
+   * - updated_at
+     - DATETIME
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP ON UPDATE
+   * - created_by
+     - VARCHAR(100)
+     - YES
+     -
+
+**Indexes:**
+
+- ``idx_coa_uuid`` on ``uuid`` (UNIQUE)
+- ``idx_coa_contact`` on ``contact_id``
+- ``idx_coa_org`` on ``organization_id``
+- ``idx_coa_active`` on ``contact_id, is_active``
+- ``ux_coa_one_primary`` on ``(contact_id, is_primary_key)`` (UNIQUE)
+  — enforces at most one primary affiliation per contact at DB level
+
+**Deliberately not indexed as UNIQUE:**
+``(contact_id, organization_id)`` is intentionally *not* unique. A
+contact may have multiple rows for the same organization over time
+(e.g., employed 2020-2022, rehired 2024-present) via distinct
+``start_date``/``end_date`` windows. Forcing uniqueness would force
+history loss.
+
+**Normalization:** 3NF. The junction carries attributes that belong
+to the affiliation edge (title, department, seniority, dates,
+decision-maker flag) — not to either endpoint. This replaces the
+denormalized cached-pointer design that previously lived on
+``contacts.organization_id``.
+
+**Service-layer invariant (not DB-enforced):** When a contact has at
+least one affiliation row, the service layer ensures that exactly
+one has ``is_primary=TRUE``. The DB enforces "at most one" via
+``ux_coa_one_primary``; the service layer enforces "at least one"
+on create/update/delete paths (auto-promoting another row to
+primary if the current primary is deleted). Combining these two
+yields exactly-one semantics without a ``BEFORE`` trigger.
+
 .. _client-hub-dm-contact-phones:
 
 contact_phones
@@ -505,6 +706,13 @@ Multiple phone numbers per contact with type labels and provenance.
      - BIGINT UNSIGNED
      - NO
      - FK → contacts.id ON DELETE CASCADE
+   * - affiliation_id
+     - BIGINT UNSIGNED
+     - YES
+     - FK → contact_org_affiliations.id ON DELETE SET NULL.
+       NULL for personal/shared phones. Non-NULL scopes this
+       phone to a specific employer affiliation (e.g., work
+       desk line at Practice A vs. work cell at Practice B).
    * - phone_type_id
      - BIGINT UNSIGNED
      - NO
@@ -551,10 +759,32 @@ Multiple phone numbers per contact with type labels and provenance.
 - ``idx_cp_contact`` on ``contact_id``
 - ``idx_cp_phone`` on ``phone_number`` (for CTI reverse lookup)
 - ``idx_cp_primary`` on ``contact_id, is_primary``
+- ``idx_cp_affiliation`` on ``affiliation_id`` (added migration 020)
+- ``ux_cp_one_primary`` on ``(contact_id, is_primary_key)``
+  (UNIQUE, added migration 022) — enforces at most one primary
+  phone per contact via a generated column:
+  ``is_primary_key TINYINT UNSIGNED GENERATED ALWAYS AS
+  (IF(is_primary, 1, NULL)) VIRTUAL``
 
 **Normalization:** 3NF. Phone type is a FK to a lookup table.
 Provenance fields (``data_source``, ``is_enriched``, ``verified_at``)
 are attributes of *this phone record*, not of the contact.
+
+**Affiliation scoping (migration 020):** ``affiliation_id`` is
+nullable and answers "does this phone belong to the person
+generically, or to a specific employer?" A personal cell phone
+has NULL; a direct-dial desk line at ACME has
+``affiliation_id`` → the ACME affiliation row. On ``DELETE`` of
+an affiliation, phones linked to it have ``affiliation_id`` set
+to NULL rather than being deleted — the phone number itself is
+still a valid datum about the contact.
+
+**Single-primary invariant (migration 022):** At most one phone
+per contact may have ``is_primary=TRUE``. Enforced at the DB level
+via a generated-column UNIQUE index (see ``ux_cp_one_primary``
+above). "At least one primary when any rows exist" is a
+service-layer invariant, not DB-enforced. The same pattern is
+applied to ``contact_emails`` and ``contact_addresses``.
 
 .. _client-hub-dm-contact-emails:
 
@@ -579,6 +809,12 @@ Multiple email addresses per contact.
      - BIGINT UNSIGNED
      - NO
      - FK → contacts.id ON DELETE CASCADE
+   * - affiliation_id
+     - BIGINT UNSIGNED
+     - YES
+     - FK → contact_org_affiliations.id ON DELETE SET NULL.
+       NULL for personal/shared emails. Non-NULL scopes this
+       email to a specific employer affiliation.
    * - email_type_id
      - BIGINT UNSIGNED
      - NO
@@ -621,6 +857,14 @@ Multiple email addresses per contact.
 - ``idx_ce_contact`` on ``contact_id``
 - ``idx_ce_email`` on ``email_address`` (for Chatwoot reverse lookup)
 - ``idx_ce_primary`` on ``contact_id, is_primary``
+- ``idx_ce_affiliation`` on ``affiliation_id`` (added migration 020)
+- ``ux_ce_one_primary`` on ``(contact_id, is_primary_key)``
+  (UNIQUE, added migration 022) — see the ``contact_phones``
+  section for the generated-column pattern.
+
+**Affiliation scoping:** Same semantics as ``contact_phones`` —
+NULL for personal, non-NULL for employer-scoped. A work email at
+ACME (``jane@acme.com``) should point at the ACME affiliation row.
 
 .. _client-hub-dm-contact-addresses:
 
@@ -645,6 +889,13 @@ Physical addresses per contact.
      - BIGINT UNSIGNED
      - NO
      - FK → contacts.id ON DELETE CASCADE
+   * - affiliation_id
+     - BIGINT UNSIGNED
+     - YES
+     - FK → contact_org_affiliations.id ON DELETE SET NULL.
+       NULL for personal/shared addresses. Non-NULL scopes this
+       address to a specific employer affiliation (e.g., work
+       location for the ACME job).
    * - address_type_id
      - BIGINT UNSIGNED
      - NO
@@ -706,6 +957,15 @@ Physical addresses per contact.
 
 - ``idx_ca_contact`` on ``contact_id``
 - ``idx_ca_postal`` on ``postal_code``
+- ``idx_ca_affiliation`` on ``affiliation_id`` (added migration 020)
+- ``ux_ca_one_primary`` on ``(contact_id, is_primary_key)``
+  (UNIQUE, added migration 022) — see the ``contact_phones``
+  section for the generated-column pattern.
+
+**Affiliation scoping:** Same semantics as ``contact_phones`` and
+``contact_emails``. A personal home address has
+``affiliation_id=NULL``; a work address tied to the ACME
+affiliation points at that affiliation row.
 
 .. _client-hub-dm-org-phones:
 
@@ -1139,7 +1399,7 @@ v_contact_summary
 
 Comprehensive intelligence view — one row per contact with:
 
-- Identity: name, type, organization, enrichment status
+- Identity: name, type, primary organization, enrichment status
 - Marketing flags: opt-out booleans for SMS, email, phone
 - Primary contact details: phone number, email address
 - Order stats: total orders, lifetime value, last order date
@@ -1150,6 +1410,18 @@ Comprehensive intelligence view — one row per contact with:
 
 This is the "holistic view" referenced in the project vision. Use it
 for customer analysis, marketing intelligence, and integration lookups.
+
+**Rewritten in migration 021:** The primary organization columns
+(``organization_id``, ``organization_name``) previously came from
+the dropped ``contacts.organization_id`` FK via
+``LEFT JOIN organizations``. They now come from the
+``is_primary=1`` row in ``contact_org_affiliations``, joined
+through ``organizations`` via the affiliation's
+``organization_id``. Contacts with no primary affiliation (either
+no affiliations at all, or all affiliations with
+``is_primary=FALSE``) see NULL in the organization columns.
+``role_title`` and ``department`` from the primary affiliation are
+now also surfaced on the view for integration convenience.
 
 .. _client-hub-dm-orders:
 
@@ -1632,6 +1904,14 @@ Junction Tables Summary
    * - contact_marketing_sources
      - contacts ↔ marketing_sources
      - A contact can arrive via multiple marketing channels
+   * - contact_org_affiliations
+     - contacts ↔ organizations
+     - A contact can work at multiple organizations; an organization
+       has many affiliated contacts. Carries per-affiliation
+       attributes (title, department, seniority, dates,
+       decision-maker, primary flag). Replaces the dropped
+       ``contacts.organization_id`` denormalized cached pointer.
+       Introduced migration 019.
 
 .. _client-hub-dm-normalization:
 
@@ -1671,6 +1951,25 @@ All tables satisfy Third Normal Form (3NF):
 - ``orders.subtotal/tax_amount/total`` — Point-in-time financial
   snapshots. Not computable from current line items because prices
   may change after order creation.
+- ``contact_org_affiliations.department`` — Stored as free-text
+  VARCHAR(100) rather than a FK to a lookup table. Departments are
+  organization-specific vocabulary (``Clinical`` at a dental
+  practice ≠ ``Clinical`` at a law firm), so normalizing them into
+  a shared ``departments`` lookup would force a fake hierarchy.
+  Free-text here is not a 3NF violation — there is no shared
+  categorical vocabulary being denormalized.
+
+**Historical correction (migration 019–021):** Prior to migration
+019, ``contacts.organization_id`` was a nullable FK that modeled
+"a contact has at most one organization." That was a denormalized
+cached pointer duplicating a fact that belonged in a junction
+table. Migration 019 introduced ``contact_org_affiliations`` as
+the proper many-to-many junction with per-affiliation attributes;
+migration 021 dropped the cached pointer and rewrote
+``v_contact_summary`` to source organization info from the
+junction. This correction is the canonical example of the
+"maintain 3NF even when migration surface is larger" rule in
+force on this project.
 
 .. _client-hub-dm-table-count:
 
@@ -1678,14 +1977,15 @@ All tables satisfy Third Normal Form (3NF):
 Complete Table List
 **********************************************************************
 
-**Entity tables (18):**
+**Entity tables (19):**
 
 1. business_settings
-2. contacts (includes marketing_opt_out_sms/email/phone flags)
+2. contacts (multi-org via ``contact_org_affiliations``; no direct
+   ``organization_id`` FK as of migration 021)
 3. organizations
-4. contact_phones
-5. contact_emails
-6. contact_addresses
+4. contact_phones (with nullable ``affiliation_id`` as of 020)
+5. contact_emails (with nullable ``affiliation_id`` as of 020)
+6. contact_addresses (with nullable ``affiliation_id`` as of 020)
 7. org_phones
 8. org_emails
 9. org_addresses
@@ -1698,30 +1998,51 @@ Complete Table List
 16. invoices
 17. payments
 18. communications
+19. api_keys (multi-source API keys, added migration 014)
 
-**Junction tables (2):**
+**Junction tables (3):**
 
-19. contact_tag_map
-20. contact_marketing_sources
+20. contact_tag_map
+21. contact_marketing_sources
+22. contact_org_affiliations (added migration 019, replaces the
+    dropped ``contacts.organization_id`` FK)
 
-**Lookup tables (11):**
+**Lookup tables (13):**
 
-21. contact_types
-22. phone_types
-23. email_types
-24. address_types
-25. channel_types
-26. marketing_sources
-27. order_statuses
-28. order_item_types
-29. invoice_statuses
-30. payment_methods
-31. tags
+23. contact_types
+24. phone_types
+25. email_types
+26. address_types
+27. channel_types
+28. marketing_sources
+29. order_statuses
+30. order_item_types
+31. invoice_statuses
+32. payment_methods
+33. tags
+34. sources (multi-source tracking, added migration 014)
+35. seniority_levels (added migration 019)
 
-**Views (2):**
+**System tables (1):**
 
-32. v_contact_last_order — last order details per contact
-33. v_contact_summary — holistic intelligence view (lifetime value,
-    order stats, communication stats, opt-outs, tags, sources)
+36. ``_schema_migrations`` — migration tracking (added migration 018)
 
-**Total: 31 tables + 2 views**
+**Views (3):**
+
+37. v_contact_last_order — last order details per contact
+38. v_contact_summary — holistic intelligence view (rewritten in
+    migration 021 to source organization info from the
+    ``is_primary=1`` affiliation row)
+39. v_events_by_source — cross-source event stream joining
+    contacts, communications, sources (added migration 017)
+
+**Total: 36 tables + 3 views (as of migration 022).**
+
+.. note::
+
+   This section was significantly out of date prior to migrations
+   019-022 — it still listed counts from migration 013 and omitted
+   the multi-source (014), channel_types extension (016),
+   v_events_by_source (017), and _schema_migrations (018)
+   additions. Brought fully in sync as part of the multi-org
+   refactor documentation pass.

@@ -34,6 +34,68 @@ intelligence directly via SQL for internal tools and MCP access.
 **Authentication:** API key via ``X-API-Key`` header (Phase 1).
 OAuth2/JWT planned for Phase 2 when public exposure is needed.
 
+.. _client-hub-api-breaking-changes:
+
+**********************************************************************
+Breaking Changes — Multi-Org Release
+**********************************************************************
+
+The multi-org refactor (migrations 019–022, Phase 11) introduces
+breaking changes to ``/api/v1``. Per
+``docs/Migration-Strategy.rst``, Client Hub breaks ``/api/v1``
+cleanly rather than introducing ``/api/v2`` until we have external
+API consumers we don't control. Consumers update by regenerating
+their SDK from the new OpenAPI spec and applying the field changes
+below.
+
+**Contacts:**
+
+- **Removed:** ``organization_uuid`` on ``Contact`` create/update
+  request and response
+- **Added:** ``primary_organization_uuid`` on ``Contact`` response
+  (computed from the ``is_primary=true`` affiliation row)
+- **Added:** ``affiliations`` list on ``Contact`` create/update
+  request and response — each item has ``organization_uuid``,
+  ``role_title``, ``department``, ``seniority``,
+  ``is_decision_maker``, ``is_primary``, ``start_date``,
+  ``end_date``, ``notes``
+
+**Contact detail rows (phones, emails, addresses):**
+
+- **Added:** optional nullable ``affiliation_uuid`` on create /
+  update. NULL = personal/shared. Non-NULL = scoped to a specific
+  employer affiliation.
+
+**New endpoints (Contact Affiliations):**
+
+- ``GET /api/v1/contacts/{uuid}/affiliations``
+- ``POST /api/v1/contacts/{uuid}/affiliations``
+- ``PUT /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}``
+- ``DELETE /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}``
+
+**Database view changes (for direct-SQL consumers):**
+
+- ``v_contact_summary.organization_id`` — removed (no such
+  column exists on ``contacts`` anymore; the view previously
+  selected it indirectly)
+- ``v_contact_summary.organization_name`` — now sourced from the
+  ``is_primary=true`` affiliation row's organization, not from a
+  ``contacts.organization_id`` join
+- ``v_contact_summary.primary_role_title`` — new, sourced from
+  the primary affiliation
+- ``v_contact_summary.primary_department`` — new, sourced from
+  the primary affiliation
+
+**Consumer update paths:**
+
+- Complete Dental Care Next.js site — regenerate TypeScript SDK
+  and rename ``organization_uuid`` → ``primary_organization_uuid``
+  on reads; switch creates to use the ``affiliations`` list.
+- OpsInsights operator queries (read-only, direct SQL to
+  ``v_contact_summary``) — update any query that joins on
+  ``organization_id`` from the view; the new column set is
+  listed above.
+
 .. _client-hub-api-conventions:
 
 **********************************************************************
@@ -223,18 +285,48 @@ Create a new contact.
      "first_name": "Emily",
      "last_name": "Rodriguez",
      "contact_type": "lead",
-     "organization_uuid": null,
+     "affiliations": [
+       {
+         "organization_uuid": "...",
+         "role_title": "Hygienist",
+         "department": "Clinical",
+         "seniority": "mid",
+         "is_decision_maker": false,
+         "is_primary": true,
+         "start_date": "2026-01-15"
+       }
+     ],
      "phones": [
        {"number": "+15555550301", "type": "mobile", "is_primary": true}
      ],
      "emails": [
-       {"address": "emily@example.com", "type": "personal", "is_primary": true}
+       {"address": "emily@example.com", "type": "personal", "is_primary": true,
+        "affiliation_uuid": null}
      ],
      "marketing_sources": ["website"],
      "data_source": "website_form"
    }
 
-**Response (201):** Created contact object with UUID.
+**Response (201):** Created contact object with UUID, including a
+``primary_organization_uuid`` (computed from the ``is_primary=true``
+affiliation) and a nested ``affiliations`` list.
+
+**Field notes (added in the multi-org release):**
+
+- ``affiliations`` — optional list of contact-to-organization
+  affiliation rows. Each affiliation carries ``role_title``,
+  ``department`` (free-text), ``seniority`` (one of the codes in
+  the ``seniority_levels`` lookup: ``exec``, ``senior``, ``mid``,
+  ``junior``, ``intern``, ``unknown``), ``is_decision_maker``,
+  ``is_primary``, and optional ``start_date`` / ``end_date``.
+  At most one may have ``is_primary=true`` (DB-enforced).
+- ``affiliation_uuid`` on phone / email / address rows — optional
+  nullable pointer at an affiliation owning this detail. NULL
+  means personal/shared. Non-NULL scopes the phone/email/address
+  to a specific employer affiliation.
+- ``organization_uuid`` at the top level is **removed**. Use
+  ``affiliations`` instead. See the Breaking Changes section
+  below.
 
 .. _client-hub-api-contacts-update:
 
@@ -267,6 +359,93 @@ DELETE /api/v1/contacts/{uuid}
 ----------------------------------------------------------------------
 
 Soft-delete a contact (sets ``is_active=false``, ``deleted_at=NOW()``).
+
+.. _client-hub-api-affiliations:
+
+Contact Affiliations
+======================================================================
+
+Endpoints for managing a contact's organization affiliations
+directly (the multi-org junction ``contact_org_affiliations``).
+Inline affiliation creation on ``POST /contacts`` covers the common
+case; these endpoints support fine-grained management (add a second
+job, close out a past affiliation, change which is primary) without
+rewriting the full contact.
+
+.. _client-hub-api-affiliations-list:
+
+GET /api/v1/contacts/{uuid}/affiliations
+----------------------------------------------------------------------
+
+List all affiliations for a contact (active and historical).
+
+**Query params:**
+
+- ``active_only`` — ``true`` (default) filters out closed
+  affiliations (``end_date`` in the past or ``is_active=false``)
+- ``include_organization`` — ``true`` (default) embeds the
+  organization object in each affiliation row
+
+**Response (200):** Array of affiliation objects.
+
+.. _client-hub-api-affiliations-create:
+
+POST /api/v1/contacts/{uuid}/affiliations
+----------------------------------------------------------------------
+
+Add a new affiliation to a contact.
+
+**Request body:**
+
+.. code-block:: json
+
+   {
+     "organization_uuid": "a1b2c3d4-...",
+     "role_title": "VP of Operations",
+     "department": "Operations",
+     "seniority": "senior",
+     "is_decision_maker": true,
+     "is_primary": false,
+     "start_date": "2026-04-01",
+     "end_date": null,
+     "notes": "Consulting role, part-time"
+   }
+
+**Response (201):** Created affiliation object.
+
+If ``is_primary=true`` is set and another affiliation is already
+primary, the service layer demotes the previous primary to
+``is_primary=false`` in the same transaction so the DB-level
+uniqueness invariant holds.
+
+.. _client-hub-api-affiliations-update:
+
+PUT /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}
+----------------------------------------------------------------------
+
+Update an existing affiliation. Partial updates supported.
+
+**Common use cases:**
+
+- Close out an affiliation: ``{"end_date": "2026-04-23",
+  "is_active": false}``
+- Promote a different affiliation to primary: ``{"is_primary": true}``
+  (the previously-primary row is auto-demoted)
+- Update title / seniority / decision-maker flag
+
+.. _client-hub-api-affiliations-delete:
+
+DELETE /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}
+----------------------------------------------------------------------
+
+Hard-delete an affiliation. Linked detail rows (phones, emails,
+addresses that referenced this affiliation) have their
+``affiliation_id`` set to NULL per the ``ON DELETE SET NULL`` FK.
+
+If the deleted row was the primary affiliation and other
+affiliations exist, the service layer promotes the most-recent
+active affiliation to primary so the "at least one primary when
+any exist" invariant holds.
 
 .. _client-hub-api-organizations:
 
@@ -451,7 +630,7 @@ The API runs as a Python FastAPI container on ``my-main-net``.
        environment:
          DB_HOST: mariadb
          DB_PORT: 3306
-         DB_NAME: ${DB_NAME:-dev_schema}
+         DB_NAME: ${DB_NAME:-clienthub}
          DB_USER: ${DB_USER:-clienthub}
          DB_PASSWORD: ${DB_PASSWORD}
          API_KEY: ${API_KEY}
@@ -550,7 +729,7 @@ Test framework and tools:
 
 - **pytest** — Test runner
 - **httpx** / **TestClient** — FastAPI's built-in async test client
-- **Real database** — Tests run against ``dev_schema``, not mocks.
+- **Real database** — Tests run against ``clienthub``, not mocks.
   A test transaction is opened and rolled back after each test to
   avoid polluting data.
 
