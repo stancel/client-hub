@@ -172,13 +172,28 @@ DB_NAME="${DB_NAME:-clienthub}"
     || fail "MARIADB_ROOT_PASSWORD not found in .env"
 
 # ============================================================
-# Step 1: Caddyfile — add hostname block if not present
+# Step 1: Caddyfile — ensure Caddy is serving HOSTNAME with a cert
 # ============================================================
 log
 log "=== Step 1: Caddyfile ==="
 
-if grep -qF "$HOSTNAME {" Caddyfile; then
-    log "Hostname block already present in Caddyfile — skipping."
+# Three ways a Caddy install can already be serving this hostname:
+#   (a) literal "HOSTNAME {" block in Caddyfile (explicit vhost),
+#   (b) "{\$DOMAIN} {" template block + DOMAIN env var set to HOSTNAME,
+#   (c) some other Caddy config that's already produced an LE cert.
+# All three cases leave a populated cert directory under ./data/caddy.
+# If the cert is already there we don't need to touch Caddyfile; the
+# rest of this script only needs the cert file path.
+EXISTING_CERT="$INSTALL_DIR/data/caddy/caddy/certificates/acme-v02.api.letsencrypt.org-directory/$HOSTNAME/$HOSTNAME.crt"
+
+if [[ -f "$EXISTING_CERT" ]]; then
+    log "Cert already issued for $HOSTNAME at $EXISTING_CERT — skipping Caddyfile step."
+elif grep -qF "$HOSTNAME {" Caddyfile; then
+    log "Hostname block already present in Caddyfile but cert not yet issued."
+    log "Reloading Caddy to retrigger cert issuance..."
+    run "docker exec clienthub-caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile"
+    log "Waiting 25s for Let's Encrypt HTTP-01 to complete..."
+    $DRY_RUN || sleep 25
 else
     log "Backing up Caddyfile and appending new site block..."
     run "cp -n Caddyfile Caddyfile.bak-pre-opsinsights"
@@ -334,10 +349,19 @@ log "DOCKER-USER chain (IPv4):"
 $DRY_RUN || iptables -L DOCKER-USER -n --line-numbers
 
 log "Installing iptables-persistent..."
-if ! dpkg -l iptables-persistent >/dev/null 2>&1; then
+# The `dpkg -l` check returns 0 even when a package is in the "un"
+# (unknown/not-installed) state, so verify by checking for the actual
+# binary instead. Once installed, fail loudly if the command still
+# isn't on PATH — previously this silently fell through to a
+# "netfilter-persistent: command not found" later on.
+if ! command -v netfilter-persistent >/dev/null 2>&1; then
     run "echo iptables-persistent iptables-persistent/autosave_v4 boolean false | debconf-set-selections"
     run "echo iptables-persistent iptables-persistent/autosave_v6 boolean false | debconf-set-selections"
+    run "DEBIAN_FRONTEND=noninteractive apt-get update -qq"
     run "DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent"
+fi
+if ! $DRY_RUN && ! command -v netfilter-persistent >/dev/null 2>&1; then
+    fail "iptables-persistent install did not register netfilter-persistent on PATH. Try: sudo apt-get install iptables-persistent"
 fi
 
 run "netfilter-persistent save"
@@ -447,17 +471,18 @@ if ! $DRY_RUN; then
         if $REQUIRE_SSL; then
             # Non-TLS MUST be rejected when REQUIRE SSL is on
             if docker exec clienthub-mariadb mariadb \
-                   -h127.0.0.1 --ssl=0 -u"$MARIADB_USER" -p"$OPS_PASS" \
+                   -h127.0.0.1 --skip-ssl -u"$MARIADB_USER" -p"$OPS_PASS" \
                    "$DB_NAME" -e "SELECT 1;" 2>&1 | grep -q "Access denied"; then
                 log "Non-TLS connection correctly rejected (REQUIRE SSL enforced)."
             else
                 warn "Non-TLS connection was NOT rejected — REQUIRE SSL clause not working."
             fi
         else
-            # Non-TLS should work when REQUIRE SSL is off (--no-require-ssl mode)
+            # Non-TLS should work when REQUIRE SSL is off (--no-require-ssl mode).
+            # mariadb client prints "1\n1" for SELECT 1 (header + row); match either.
             if docker exec clienthub-mariadb mariadb \
-                   -h127.0.0.1 --ssl=0 -u"$MARIADB_USER" -p"$OPS_PASS" \
-                   "$DB_NAME" -e "SELECT 1;" 2>&1 | grep -q "^1$"; then
+                   -h127.0.0.1 --skip-ssl -u"$MARIADB_USER" -p"$OPS_PASS" \
+                   "$DB_NAME" -e "SELECT 1;" 2>&1 | grep -qE "^1$"; then
                 log "Non-TLS connection succeeded (--no-require-ssl mode)."
             else
                 warn "Non-TLS connection failed unexpectedly — check MariaDB config."
