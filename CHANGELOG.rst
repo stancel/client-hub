@@ -4,6 +4,124 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-24:
+
+2026-04-24 — Multi-Org Refactor + Schema Name Standardization
+==========================================================================
+
+Two coordinated changes landed in one release: (1) multi-org
+affiliations via a proper junction table (replacing the denormalized
+``contacts.organization_id`` cached pointer), and (2) schema-name
+standardization on ``clienthub`` across every environment.
+
+**Breaking changes (clean break, no dual versioning):**
+
+- ``/api/v1/contacts`` — ``organization_uuid`` removed from
+  create/update requests and responses. Use the new
+  ``affiliations`` list instead. Responses now carry
+  ``primary_organization_uuid`` (computed from the
+  ``is_primary=true`` affiliation) and a nested
+  ``affiliations[]`` list.
+- ``/api/v1/contacts/{uuid}/summary`` — ``organization`` replaced
+  by ``primary_organization_uuid``, ``primary_organization_name``,
+  ``primary_role_title``, ``primary_department``.
+- Contact phone/email/address create accepts new optional
+  ``affiliation_uuid`` to scope work-specific rows.
+- ``v_contact_summary`` view rewritten (migration 021) —
+  ``organization_id`` column gone; ``organization_name`` now
+  sourced from the primary affiliation; new columns
+  ``primary_role_title``, ``primary_department``.
+- Local Cybertron development DB renamed: ``dev_schema`` →
+  ``clienthub`` (backup saved at
+  ``backups/dev_schema_pre_rename_20260424_123810.sql``). Sister
+  ``~/docker/mariadb/`` project standardized on same name.
+  CI test database renamed ``test_schema`` →
+  ``clienthub_test`` in ``.github/workflows/ci.yml``.
+
+**Migrations:**
+
+- **019** ``contact_org_affiliations.sql`` — Junction table +
+  ``seniority_levels`` lookup (exec/senior/mid/junior/intern/unknown)
+  + backfill from ``contacts.organization_id`` + generated-column
+  partial-unique index ``ux_coa_one_primary`` enforcing at most
+  one primary affiliation per contact at the DB level.
+- **020** ``contact_details_affiliation_fk.sql`` — Nullable
+  ``affiliation_id`` FK on contact_phones, contact_emails,
+  contact_addresses (``ON DELETE SET NULL``).
+- **021** ``drop_contacts_organization_id.sql`` — Drops the
+  legacy FK + column; rewrites ``v_contact_summary`` to source
+  organization info from the primary affiliation.
+- **022** ``primary_uniqueness_details.sql`` — Generated-column
+  partial-unique indexes on all three detail tables enforcing
+  "at most one primary per contact" at the DB level (previously
+  service-layer-only).
+
+All four migrations are idempotent (``CREATE TABLE IF NOT EXISTS``,
+``ADD COLUMN IF NOT EXISTS``, ``INSERT ... ON DUPLICATE KEY UPDATE``,
+INFORMATION_SCHEMA-guarded dynamic SQL for constraints, ``NOT EXISTS``
+guarded backfills).
+
+**API surface additions:**
+
+- ``GET /api/v1/contacts/{uuid}/affiliations`` —
+  list (with ``active_only`` filter)
+- ``POST /api/v1/contacts/{uuid}/affiliations`` — create
+- ``PUT /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}`` —
+  update (with primary promotion auto-demoting the current primary)
+- ``DELETE /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}`` —
+  hard-delete (auto-promotes another active affiliation to primary
+  when the current primary is deleted, if any remain)
+
+**Invariant model:**
+
+- "At most one primary per contact" is now DB-enforced across
+  ``contact_org_affiliations``, ``contact_phones``,
+  ``contact_emails``, ``contact_addresses`` via virtual generated
+  columns (``is_primary_key = IF(is_primary, 1, NULL)``) plus
+  composite UNIQUE indexes. NULL doesn't participate in UNIQUE on
+  InnoDB/MariaDB, so non-primary rows are unconstrained.
+- "At least one primary when any rows exist" is service-layer
+  enforced (affiliations only — phone/email/address "at least one"
+  is advisory).
+- Combined semantics: exactly-one-primary when any rows exist,
+  without needing ``BEFORE`` triggers.
+
+**Documentation:**
+
+- New ``docs/Migration-Strategy.rst`` playbook codifying the
+  idempotent-migration + TDD-first + bundled-PR pattern for future
+  schema refactors.
+- ``docs/data-model.rst`` fully updated; also synced the
+  previously-stale 014–018 gaps in the Complete Table List
+  (entity/junction/lookup/system counts).
+- ``docs/api-design.rst`` — new Breaking Changes section at the top
+  + Contact Affiliations endpoint group.
+
+**Testing:**
+
+- 12 new tests in ``tests/test_contact_affiliations.py`` covering
+  list/create/update/delete, demote-previous-primary, promote-on-delete,
+  inline affiliation on ``POST /contacts``, and the contact summary's
+  new primary-org fields.
+- Total: **101 passing** (was 89).
+
+**SDK regeneration:**
+
+Local regen was blocked by root-owned files in ``sdks/python/docs/``
+from a prior container-based generate. CI (``generate-sdks`` job on
+master branch) regenerates cleanly on merge. One-time followup:
+``sudo chown -R brad:brad sdks/`` on Cybertron to unblock future
+local regens.
+
+**Rollout / operations:**
+
+- Cybertron local Cybertron DB cutover executed:
+  stop client-hub-api → backup → create ``clienthub`` → restore
+  dump → update ``.env`` → restart → smoke test → drop
+  ``dev_schema``. Row counts match pre-rename.
+- Complete Dental Care VPS already uses ``clienthub`` per the
+  bundled deployment pattern — no change needed there.
+
 .. _client-hub-changelog-2026-04-22:
 
 2026-04-22 — README: Prominent One-Line Installer Section
@@ -384,7 +502,9 @@ Major implementation based on Installation-Implementation-Prompt.rst:
   decisions
 - Corrected tenant model: single-tenant (one DB per business), not
   multi-tenant
-- Development database: ``dev_schema`` on shared MariaDB
+- Development database: ``clienthub`` on shared MariaDB
+  (originally ``dev_schema``; renamed during the
+  standardization sweep on 2026-04-24)
 
 .. _client-hub-changelog-2026-04-05b:
 

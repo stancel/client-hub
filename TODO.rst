@@ -28,7 +28,7 @@ Phase 2 — Schema Implementation [COMPLETE]
 - [x] Create ``migrations/`` directory with numbered SQL files
 - [x] Write DDL for all tables and views (migrations 001-018;
   012 is dev/CI-only seed data relocated to ``migrations/dev/``)
-- [x] Execute all migrations against ``dev_schema`` via MCP tools
+- [x] Execute all migrations against ``clienthub`` via MCP tools
 - [x] Verify schema with ``search_objects`` MCP tool
 - [x] Seed lookup tables with initial reference data (58 rows)
 
@@ -151,6 +151,44 @@ Phase 10 — external_refs_json Data-Loss Fix [COMPLETE]
   ``docs/Dental-Care-Payload-Fix-Prompt.rst`` created for the
   thin-payload + booking.cancelled overwrite issues discovered
   during verification
+
+.. _client-hub-todo-phase11:
+
+Phase 11 — Multi-Org Affiliations + Schema Standardization [COMPLETE]
+======================================================================
+
+Data model went from "contact has at most one organization" to proper
+many-to-many via ``contact_org_affiliations``. Schema name
+standardized on ``clienthub`` across code, CI, docs, and live
+Cybertron local MariaDB.
+
+- [x] Design: ``docs/data-model.rst`` + ``docs/api-design.rst``
+  sections for ``contact_org_affiliations``, ``seniority_levels``,
+  affiliation_id on contact_phones/emails/addresses
+- [x] ``docs/Migration-Strategy.rst`` playbook codifying the
+  idempotent-numbered-migration + TDD-first pattern
+- [x] Migration 019 — ``contact_org_affiliations`` junction +
+  ``seniority_levels`` lookup + backfill from
+  ``contacts.organization_id``
+- [x] Migration 020 — nullable ``affiliation_id`` FK on
+  contact_phones, contact_emails, contact_addresses
+- [x] Migration 021 — drop ``contacts.organization_id`` +
+  rewrite ``v_contact_summary`` to source org from primary
+  affiliation
+- [x] Migration 022 — generated-column partial-unique indexes
+  enforcing "at most one primary per contact" on detail tables
+- [x] New affiliation endpoints under
+  ``/api/v1/contacts/{uuid}/affiliations`` (list/create/update/delete)
+  with service-layer primary promotion/demotion
+- [x] Clean break of ``/api/v1`` (no dual versioning) —
+  ``organization_uuid`` on Contact removed; new
+  ``primary_organization_uuid`` + ``affiliations`` list in responses
+- [x] 101 tests passing (89 + 12 new affiliation tests)
+- [x] Schema rename ``dev_schema`` → ``clienthub`` across all
+  code, CI, docs; Cybertron local DB renamed end-to-end
+- [x] Sister ``~/docker/mariadb/`` project standardized on
+  ``clienthub`` default (``.env``, ``.env.example``,
+  ``docker-compose.yml``)
 
 .. _client-hub-todo-future:
 
