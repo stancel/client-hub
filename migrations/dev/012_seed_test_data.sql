@@ -18,11 +18,18 @@ INSERT IGNORE INTO tags (code, label, sort_order) VALUES
 ('referral_source', 'Referral Source', 3);
 
 -- Contacts (5 total: 2 clients, 1 prospect, 1 lead, 1 vendor)
-INSERT IGNORE INTO contacts (uuid, contact_type_id, organization_id, first_name, last_name, display_name, enrichment_status, external_refs_json, created_by)
-VALUES (UUID(), 1, NULL, 'Sarah', 'Johnson', NULL, 'complete', '{"invoiceninja": "INV-C-001", "chatwoot": "CW-1001"}', 'system');
+-- (Migration 021 dropped contacts.organization_id — organization
+--  links now live in contact_org_affiliations; see affiliation
+--  INSERT below.)
+INSERT IGNORE INTO contacts (uuid, contact_type_id, first_name, last_name, display_name, enrichment_status, external_refs_json, created_by)
+VALUES (UUID(), 1, 'Sarah', 'Johnson', NULL, 'complete', '{"invoiceninja": "INV-C-001", "chatwoot": "CW-1001"}', 'system');
 
-INSERT IGNORE INTO contacts (uuid, contact_type_id, organization_id, first_name, last_name, enrichment_status, created_by)
-VALUES (UUID(), 2, 1, 'Dr. Michael', 'Chen', 'partial', 'system');
+INSERT IGNORE INTO contacts (uuid, contact_type_id, first_name, last_name, enrichment_status, created_by)
+VALUES (UUID(), 2, 'Dr. Michael', 'Chen', 'partial', 'system');
+
+-- Affiliation: Dr. Michael Chen (contact 2) is primary at Dallas Dental Group (org 1)
+INSERT IGNORE INTO contact_org_affiliations (uuid, contact_id, organization_id, role_title, is_primary, is_active, created_by)
+VALUES (UUID(), 2, 1, 'Lead Dentist', TRUE, TRUE, 'system');
 
 INSERT IGNORE INTO contacts (uuid, contact_type_id, first_name, last_name, enrichment_status, created_by)
 VALUES (UUID(), 3, 'Emily', 'Rodriguez', 'needs_review', 'website_form');
