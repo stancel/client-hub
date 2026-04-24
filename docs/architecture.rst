@@ -82,7 +82,7 @@ Docker DNS (``mariadb:3306``).
    ┌─────────────────────────────────────────┐
    │    client-hub-api (FastAPI)             │
    │    Port 8800 on my-main-net            │
-   │    23 endpoints, X-API-Key auth        │
+   │    30 endpoints, X-API-Key auth        │
    │    Swagger: /docs  OpenAPI: /openapi.json│
    └─────────────────┬───────────────────────┘
                      │ SQLAlchemy async (aiomysql)
@@ -91,7 +91,7 @@ Docker DNS (``mariadb:3306``).
    │    Shared MariaDB 12.2.2               │
    │    ~/docker/mariadb/ (port 3306)       │
    │    Database: clienthub                │
-   │    31 tables + 2 views (3NF)           │
+   │    36 tables + 3 views (3NF)           │
    └─────────────────────────────────────────┘
           ▲                    ▲
           │                    │
@@ -172,7 +172,7 @@ Pydantic v2.
      - Purpose
    * - Routers
      - ``api/app/routers/``
-     - Endpoint handlers (9 router modules)
+     - Endpoint handlers (11 router modules)
    * - Services
      - ``api/app/services/``
      - Business logic (contact, lookup, webhook)
@@ -187,7 +187,7 @@ Pydantic v2.
      - API key authentication
    * - Tests
      - ``api/tests/``
-     - 63 tests across 13 files (TDD, real DB)
+     - 101 tests across 18 files (TDD, real DB)
 
 .. _client-hub-arch-data-model:
 

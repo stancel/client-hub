@@ -190,6 +190,40 @@ Cybertron local MariaDB.
   ``clienthub`` default (``.env``, ``.env.example``,
   ``docker-compose.yml``)
 
+.. _client-hub-todo-phase12:
+
+Phase 12 — Ops Hardening + OpsInsights Override Pattern [COMPLETE]
+======================================================================
+
+Follow-on from the live multi-org upgrades on Clever Orchid and
+Complete Dental Care, plus the regression where ``git reset --hard``
+clobbered OpsInsights compose patches.
+
+- [x] ``scripts/upgrade.sh`` — coordinated VPS upgrade runner
+  (interactive by default, ``--yes`` for routine reruns) codifying
+  the Migration-Strategy.rst Phase 5 deploy sequence
+- [x] ``bootstrap-migrations.sh`` ``--via-docker`` flag for bundled
+  VPSes whose MariaDB isn't published to the host
+- [x] ``setup-opsinsights-tls.sh`` cert-aware step 1 (skips Caddy
+  patch when cert already exists), netfilter-persistent install
+  verification, ``--skip-ssl`` (not ``--ssl=0``) in the REQUIRE SSL
+  test
+- [x] New ``scripts/backfill-schema-tracker.sh`` — record pre-mig-018
+  migrations as applied for old installs whose tracker is empty
+- [x] New ``scripts/detect-drift.sh`` — sanity-check FK column types
+  (canonical ``BIGINT UNSIGNED`` vs drifted ``int(11)``) before any
+  upgrade that adds an FK column
+- [x] OpsInsights override pattern: ``setup-opsinsights-tls.sh`` now
+  writes ``docker-compose.opsinsights.yml`` (gitignored override)
+  instead of mutating ``docker-compose.bundled.yml`` in place
+- [x] ``upgrade.sh``, ``backup.sh``, ``uninstall.sh`` auto-include
+  the override file when present
+- [x] Both live VPSes migrated to the override pattern;
+  ``docker-compose.bundled.yml`` is now canonical on both
+- [x] Live upgrade procedure validated end-to-end on Clever Orchid
+  (rebuild path, drift correction) and Complete Dental Care
+  (standard path)
+
 .. _client-hub-todo-future:
 
 Future — Planned Work

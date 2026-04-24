@@ -4,7 +4,118 @@
 Client Hub — Changelog
 ######################################################################
 
-.. _client-hub-changelog-2026-04-24:
+.. _client-hub-changelog-2026-04-24b:
+
+2026-04-24 — Live VPS Upgrades + Operational Hardening
+==========================================================================
+
+Follow-on to the morning's multi-org work (2026-04-24a). The
+multi-org release was deployed to both live VPSes
+(Clever Orchid Embroidery and Complete Dental Care Columbia) and
+the upgrade exposed three latent issues that all got fixed and
+codified for the next release.
+
+**Live deployments:**
+
+- **Clever Orchid** (``client-hub.cleverorchid.com`` /
+  ``165.245.130.39``) upgraded via the rebuild path. ``int(11)``
+  drift DB-wide (root cause unknown — predates current
+  ``install.sh``) made the canonical FK in migration 019
+  uncreatable, so the schema was rebuilt from migrations 001-022
+  and data restored from a data-only dump. 15 contacts, 17
+  communications, 1 affiliation backfilled; zero data loss.
+- **Complete Dental Care** (``165.245.141.244``) upgraded via the
+  standard path; no drift, ``_schema_migrations`` properly
+  populated. 21 contacts, 24 comms, 4 orders preserved.
+- **OpsInsights setup completed on Complete Dental Care:** TLS
+  cert mounted from Caddy's Let's Encrypt directory, port 3306
+  published, iptables ``DOCKER-USER`` allowlist for
+  ``52.72.248.4`` and ``52.207.33.249``, ``opsinsights_ro`` user
+  with ``REQUIRE SSL``.
+
+**OpsInsights regression on Clever Orchid (root cause + fix):**
+
+The rebuild's ``git reset --hard origin/master`` step reverted
+``docker-compose.bundled.yml`` to canonical, wiping the in-place
+patches that ``setup-opsinsights-tls.sh`` had applied on
+2026-04-18 (port publish, TLS cert mount,
+``--ssl-cert``/``--ssl-key`` flags). The recreated MariaDB
+container came up without OpsInsights connectivity. The
+``opsinsights_ro`` user, GRANTs, iptables rules, and cert
+staging directory all survived — only the compose plumbing was
+gone. Refactored to a durable override pattern (below) so the
+next upgrade doesn't repeat this.
+
+**Refactor — OpsInsights to ``docker-compose.opsinsights.yml`` override:**
+
+- ``scripts/setup-opsinsights-tls.sh`` no longer edits
+  ``docker-compose.bundled.yml`` in place. Instead it writes a
+  gitignored ``docker-compose.opsinsights.yml`` carrying only the
+  OpsInsights additions (port publish, cert mount, ssl flags).
+  Docker Compose merges it via
+  ``docker compose -f bundled.yml -f opsinsights.yml``.
+- Migration logic detects legacy in-place patches and reverts
+  them via ``.bak-pre-opsinsights`` or ``git checkout`` before
+  writing the override.
+- ``scripts/upgrade.sh``, ``scripts/backup.sh``,
+  ``scripts/uninstall.sh`` all auto-include the override file
+  when present, so every ``docker compose`` invocation matches
+  the running container set.
+- Both live VPSes migrated to the override pattern. Their
+  ``docker-compose.bundled.yml`` is now canonical (matches
+  ``origin/master``); OpsInsights state lives only in the
+  gitignored override file. Existing ``opsinsights_ro``
+  passwords preserved (no ``--rotate-password``).
+
+**New ops scripts:**
+
+- ``scripts/upgrade.sh`` — coordinated VPS upgrade runner that
+  codifies the Migration-Strategy.rst Phase 5 deploy sequence.
+  Interactive by default; ``--yes`` skips pauses for routine
+  reruns. Prints rollback command line at the end with the
+  exact backup path and prior HEAD.
+- ``scripts/detect-drift.sh`` — exits 0 when ``contacts.id`` is
+  the canonical ``BIGINT UNSIGNED``, exit 1 otherwise. Run before
+  any upgrade that adds an FK column.
+- ``scripts/backfill-schema-tracker.sh`` — one-shot helper to
+  populate ``_schema_migrations`` on installs older than mig 018
+  (the migration that introduced the tracker). Without this,
+  ``bootstrap-migrations.sh`` re-attempts every migration from
+  001 onwards and trips on non-idempotent ``ALTER`` in mig 013.
+
+**``bootstrap-migrations.sh`` ``--via-docker`` flag:**
+
+Bundled VPS compose files don't publish MariaDB on 3306 until
+OpsInsights setup runs. The host ``mariadb`` client therefore
+can't reach ``127.0.0.1:3306`` and the bootstrap script silently
+exited after the header. New flag bypasses the published port:
+``--via-docker clienthub-mariadb`` runs every mariadb command
+via ``docker exec -i``.
+
+**``setup-opsinsights-tls.sh`` smaller fixes:**
+
+- Step 1 now checks the Caddy cert directory before grepping the
+  Caddyfile for a literal ``HOSTNAME {`` block. Fixes the false
+  positive on installs that use the ``{$DOMAIN}`` template form
+  (Complete Dental Care).
+- Step 4 ``iptables-persistent`` install now verifies
+  ``netfilter-persistent`` actually ended up on PATH. The
+  previous ``dpkg -l`` check returned 0 even for packages in
+  ``un`` state, so a silent install failure manifested later as
+  ``netfilter-persistent: command not found``.
+- Step 8 verification switched from ``--ssl=0`` (a soft hint
+  that can still negotiate TLS in modern MariaDB clients) to
+  ``--skip-ssl`` (the actual disable). Eliminates the false
+  positive "REQUIRE SSL not enforced" warning.
+
+**Doc sync:**
+
+CLAUDE.md, README.rst, docs/architecture.rst, TODO.rst headline
+numbers refreshed against reality (36 tables + 3 views, 30
+endpoint paths, 101 tests across 18 files, 12 shell scripts, 17
+docs/ files). New TODO Phase 12 entry tracks all of the above.
+
+.. _client-hub-changelog-2026-04-24a:
 
 2026-04-24 — Multi-Org Refactor + Schema Name Standardization
 ==========================================================================

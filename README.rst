@@ -114,11 +114,11 @@ Quick Info
    * - **DB Name**
      - ``clienthub``
    * - **Schema**
-     - 34 tables + 3 views (3NF normalized)
+     - 36 tables + 3 views (3NF normalized)
    * - **API Endpoints**
-     - 28 paths across 10 routers
+     - 30 paths across 11 routers
    * - **Test Suite**
-     - 89 tests across 17 files
+     - 101 tests across 18 files
    * - **SDKs**
      - Python, PHP, TypeScript (auto-generated from OpenAPI)
    * - **CI/CD**
@@ -153,7 +153,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    ┌─────────────────────────────────────────┐
    │         client-hub-api (FastAPI)        │
    │         Port 8800 on my-main-net       │
-   │    28 endpoints, API key auth          │
+   │    30 endpoints, API key auth          │
    │    Swagger UI at /docs                 │
    └─────────────────┬───────────────────────┘
                      │ SQLAlchemy (async)
@@ -162,7 +162,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    │     Shared MariaDB 12.2.2              │
    │     ~/docker/mariadb/ (port 3306)      │
    │     Database: clienthub               │
-   │     34 tables + 3 views (3NF)          │
+   │     36 tables + 3 views (3NF)          │
    └─────────────────────────────────────────┘
 
    Also accessible via:
@@ -246,6 +246,13 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
      - ``GET /contacts/{uuid}/preferences``
        ``PUT/DELETE /contacts/{uuid}/preferences/{key}``
      - Flexible key-value preferences per contact
+   * - Affiliations
+     - ``GET/POST /contacts/{uuid}/affiliations``
+       ``PUT/DELETE /contacts/{uuid}/affiliations/{affiliation_uuid}``
+     - Multi-org junction (title, department, seniority,
+       decision-maker, dates, primary). Service layer
+       auto-promotes/demotes the primary so exactly one
+       remains primary at all times.
    * - Organizations
      - ``GET/POST /organizations``
        ``GET/PUT/DELETE /organizations/{uuid}``
@@ -286,7 +293,7 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
 Database Schema
 **********************************************************************
 
-34 tables + 3 views in ``clienthub``, normalized to 3NF.
+36 tables + 3 views in ``clienthub``, normalized to 3NF.
 
 **Entity tables (19):** api_keys, business_settings, contacts,
 organizations, contact_phones, contact_emails, contact_addresses,
@@ -294,11 +301,14 @@ org_phones, org_emails, org_addresses, contact_channel_prefs,
 contact_preferences, contact_notes, orders, order_items,
 order_status_history, invoices, payments, communications
 
-**Junction tables (2):** contact_tag_map, contact_marketing_sources
+**Junction tables (3):** contact_tag_map, contact_marketing_sources,
+contact_org_affiliations (added migration 019; replaces the dropped
+``contacts.organization_id`` cached pointer)
 
-**Lookup tables (12):** contact_types, phone_types, email_types,
+**Lookup tables (13):** contact_types, phone_types, email_types,
 address_types, channel_types, marketing_sources, order_statuses,
-order_item_types, invoice_statuses, payment_methods, tags, sources
+order_item_types, invoice_statuses, payment_methods, tags, sources,
+seniority_levels (added migration 019)
 
 **System tables (1):** ``_schema_migrations`` — migration tracking
 (added in migration 018)
@@ -341,7 +351,7 @@ Testing
 **********************************************************************
 
 Test Driven Development (TDD) — every endpoint has tests.
-89 tests across 17 files, all hitting the real database.
+101 tests across 18 files, all hitting the real database.
 
 .. code-block:: bash
 
@@ -424,7 +434,9 @@ Project Structure
    ├── docker-compose.yml                    # Local Cybertron compose (shared mariadb)
    ├── docker-compose.bundled.yml            # Production bundled (API + MariaDB + Caddy TLS)
    ├── docker-compose.bundled-nodomain.yml   # Production bundled (no TLS)
-   ├── docker-compose.override.yml.example   # OpsInsights cross-DB access example
+   ├── docker-compose.override.yml.example   # Local override example (cross-DB access)
+   ├── docker-compose.opsinsights.yml        # Per-VPS OpsInsights override (gitignored;
+   │                                         #  written by setup-opsinsights-tls.sh)
    ├── .env                                  # Environment variables (git-ignored)
    ├── .env.example                          # Template for .env
    ├── .gitignore
@@ -439,17 +451,21 @@ Project Structure
    │   │   ├── database.py
    │   │   ├── models/                       # SQLAlchemy ORM models
    │   │   ├── schemas/                      # Pydantic request/response
-   │   │   ├── routers/                      # Endpoint handlers (10 routers)
+   │   │   ├── routers/                      # Endpoint handlers (11 routers)
    │   │   ├── services/                     # Business logic
    │   │   └── middleware/                   # API key auth (root + source-scoped)
-   │   └── tests/                            # 89 tests, 17 files
-   ├── migrations/                           # 17 numbered SQL files (001-018)
+   │   └── tests/                            # 101 tests, 18 files
+   ├── migrations/                           # 21 numbered SQL files (001-022)
    │   └── dev/                              # Dev/CI-only seed data
    │       └── 012_seed_test_data.sql
-   ├── scripts/                              # 8 shell scripts
+   ├── scripts/                              # 12 shell scripts
    │   ├── install.sh                        # One-line production installer
    │   ├── uninstall.sh                      # Preserves .env + install summary
-   │   ├── bootstrap-migrations.sh           # First-run migration runner
+   │   ├── upgrade.sh                        # Coordinated VPS upgrade runner
+   │   ├── bootstrap-migrations.sh           # Migration runner (--via-docker for bundled VPSes)
+   │   ├── backfill-schema-tracker.sh        # Record pre-mig-018 migrations as applied
+   │   ├── detect-drift.sh                   # Sanity-check FK column types pre-upgrade
+   │   ├── setup-opsinsights-tls.sh          # OpsInsights TLS + IP-allowlist setup
    │   ├── generate-sdks.sh                  # SDK generation (Python/PHP/TS)
    │   ├── generate-api-key.sh               # Create source-scoped API keys
    │   ├── smoke-test.sh                     # Post-install smoke test
@@ -460,16 +476,20 @@ Project Structure
    │   ├── python/
    │   ├── php/
    │   └── typescript/
-   ├── docs/                                 # RST documentation (13 files)
+   ├── docs/                                 # RST documentation (17 files)
    │   ├── architecture.rst
    │   ├── data-model.rst
    │   ├── api-design.rst
    │   ├── ci-cd.rst
+   │   ├── Migration-Strategy.rst
    │   ├── Multi-Source.rst
    │   ├── Deployment.rst
    │   ├── Upgrade.rst
    │   ├── Data-Privacy.rst
    │   ├── Cross-Project-Integration.rst
+   │   ├── OpsInsights-Direct-TLS-Plan.rst
+   │   ├── OpsInsights-Setup-Prompt.rst
+   │   ├── OpsInsights-SSH-Tunnel-Plan.rst
    │   ├── Installation-Implementation-Prompt.rst
    │   ├── Post-Deployment-Fixes-Prompt.rst
    │   ├── External-Refs-Json-Fix-Prompt.rst

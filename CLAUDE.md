@@ -10,8 +10,8 @@
 - **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
-- **Schema:** 34 tables + 3 views in `clienthub` (3NF)
-- **API:** 28 endpoint paths, 89 tests passing
+- **Schema:** 36 tables + 3 views in `clienthub` (3NF)
+- **API:** 30 endpoint paths, 101 tests passing
 - **SDKs:** Python, PHP, TypeScript (auto-generated)
 - **CI/CD:** GitHub Actions (lint → test → build → SDK gen)
 - **Deployment:** one-line installer (`scripts/install.sh`); first
@@ -68,29 +68,34 @@ The API container runs on `my-main-net` and connects to `mariadb:3306`.
 client-hub/
 ├── api/                                  # FastAPI application (Python 3.12)
 │   ├── app/                              # Models, routers, schemas, services, middleware
-│   └── tests/                            # 89 tests across 17 files
-├── migrations/                           # 17 numbered SQL migrations (001-018, 012 in dev/)
+│   └── tests/                            # 101 tests across 18 files
+├── migrations/                           # 21 numbered SQL migrations (001-022; 012 in dev/)
 │   └── dev/                              # Dev/CI-only seed data (012_seed_test_data.sql)
 ├── scripts/                              # install.sh, uninstall.sh, bootstrap-migrations.sh,
-│                                         # generate-sdks.sh, smoke-test.sh, cleanup-test-data.sh,
-│                                         # generate-api-key.sh, backup.sh
+│                                         # upgrade.sh, generate-sdks.sh, smoke-test.sh,
+│                                         # cleanup-test-data.sh, generate-api-key.sh,
+│                                         # backup.sh, setup-opsinsights-tls.sh,
+│                                         # detect-drift.sh, backfill-schema-tracker.sh
 ├── sdks/                                 # Auto-generated Python, PHP, TypeScript SDKs
-├── docs/                                 # RST documentation (13 files) + handoff prompts
+├── docs/                                 # RST documentation (17 files) + handoff prompts
 ├── upgrades/                             # Pre-upgrade analysis documents
 ├── .github/                              # CI/CD workflows
 ├── docker-compose.yml                    # Local Cybertron compose (my-main-net, shared mariadb)
 ├── docker-compose.bundled.yml            # Production bundled (API + MariaDB + Caddy with TLS)
 ├── docker-compose.bundled-nodomain.yml   # Production bundled (no TLS)
-└── docker-compose.override.yml.example   # OpsInsights cross-DB access example
+├── docker-compose.override.yml.example   # OpsInsights cross-DB access example
+└── docker-compose.opsinsights.yml        # Per-VPS override written by setup-opsinsights-tls.sh
+                                          # (gitignored; only present after OpsInsights setup)
 ```
 
-## API Endpoints (28 paths)
+## API Endpoints (30 paths)
 
 | Category | Endpoints |
 |---|---|
 | Health | `GET /api/v1/health` |
 | Lookup | `GET /api/v1/lookup/phone/{number}`, `GET /api/v1/lookup/email/{email}` |
 | Contacts | CRUD + convert + summary + marketing opt-outs + preferences |
+| Affiliations | `GET/POST /api/v1/contacts/{uuid}/affiliations`, `PUT/DELETE /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}` (multi-org junction; primary auto-promotes/demotes) |
 | Organizations | CRUD |
 | Orders | CRUD + status changes with history |
 | Invoices | CRUD + payment recording (auto-balance update) |
@@ -201,7 +206,7 @@ docker compose down && docker compose build --no-cache && docker compose up -d
 
 Every API endpoint has a corresponding test. Tests hit the real database.
 
-- **89 tests** across 17 test files
+- **101 tests** across 18 test files
 - Framework: pytest + httpx + AsyncClient
 - Run: `cd api && .venv/bin/python -m pytest tests/ -v`
 - Coverage: `pytest --cov=app --cov-report=term-missing`
