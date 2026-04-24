@@ -62,7 +62,8 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'due_date' => 'string',
         'scheduled_at' => 'string',
         'items' => '\ClientHub\Model\OrderItemCreate[]',
-        'notes_text' => 'string'
+        'notes_text' => 'string',
+        'external_refs_json' => 'array<string,mixed>'
     ];
 
     /**
@@ -78,7 +79,8 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'due_date' => null,
         'scheduled_at' => null,
         'items' => null,
-        'notes_text' => null
+        'notes_text' => null,
+        'external_refs_json' => null
     ];
 
     /**
@@ -92,7 +94,8 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'due_date' => true,
         'scheduled_at' => true,
         'items' => false,
-        'notes_text' => true
+        'notes_text' => true,
+        'external_refs_json' => true
     ];
 
     /**
@@ -186,7 +189,8 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'due_date' => 'due_date',
         'scheduled_at' => 'scheduled_at',
         'items' => 'items',
-        'notes_text' => 'notes_text'
+        'notes_text' => 'notes_text',
+        'external_refs_json' => 'external_refs_json'
     ];
 
     /**
@@ -200,7 +204,8 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'due_date' => 'setDueDate',
         'scheduled_at' => 'setScheduledAt',
         'items' => 'setItems',
-        'notes_text' => 'setNotesText'
+        'notes_text' => 'setNotesText',
+        'external_refs_json' => 'setExternalRefsJson'
     ];
 
     /**
@@ -214,7 +219,8 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'due_date' => 'getDueDate',
         'scheduled_at' => 'getScheduledAt',
         'items' => 'getItems',
-        'notes_text' => 'getNotesText'
+        'notes_text' => 'getNotesText',
+        'external_refs_json' => 'getExternalRefsJson'
     ];
 
     /**
@@ -280,6 +286,7 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('scheduled_at', $data ?? [], null);
         $this->setIfExists('items', $data ?? [], null);
         $this->setIfExists('notes_text', $data ?? [], null);
+        $this->setIfExists('external_refs_json', $data ?? [], null);
     }
 
     /**
@@ -509,6 +516,40 @@ class OrderCreate implements ModelInterface, ArrayAccess, \JsonSerializable
             }
         }
         $this->container['notes_text'] = $notes_text;
+
+        return $this;
+    }
+
+    /**
+     * Gets external_refs_json
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getExternalRefsJson()
+    {
+        return $this->container['external_refs_json'];
+    }
+
+    /**
+     * Sets external_refs_json
+     *
+     * @param array<string,mixed>|null $external_refs_json external_refs_json
+     *
+     * @return self
+     */
+    public function setExternalRefsJson($external_refs_json)
+    {
+        if (is_null($external_refs_json)) {
+            array_push($this->openAPINullablesSetToNull, 'external_refs_json');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('external_refs_json', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
+        }
+        $this->container['external_refs_json'] = $external_refs_json;
 
         return $this;
     }

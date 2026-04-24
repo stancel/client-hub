@@ -47,7 +47,10 @@ class TestOrderCreate(unittest.TestCase):
                         unit_price = null, 
                         discount_amount = null, )
                     ],
-                notes_text = ''
+                notes_text = '',
+                external_refs_json = {
+                    'key' : null
+                    }
             )
         else:
             return OrderCreate(

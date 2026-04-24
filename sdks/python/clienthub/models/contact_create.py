@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from clienthub.models.contact_create_email import ContactCreateEmail
 from clienthub.models.contact_create_phone import ContactCreatePhone
+from clienthub.models.inline_affiliation_create import InlineAffiliationCreate
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -31,13 +32,14 @@ class ContactCreate(BaseModel):
     first_name: StrictStr
     last_name: StrictStr
     contact_type: Optional[StrictStr] = 'prospect'
-    organization_uuid: Optional[StrictStr] = None
     display_name: Optional[StrictStr] = None
+    affiliations: Optional[List[InlineAffiliationCreate]] = None
     phones: Optional[List[ContactCreatePhone]] = None
     emails: Optional[List[ContactCreateEmail]] = None
     marketing_sources: Optional[List[StrictStr]] = None
     data_source: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["first_name", "last_name", "contact_type", "organization_uuid", "display_name", "phones", "emails", "marketing_sources", "data_source"]
+    external_refs_json: Optional[Dict[str, Any]] = None
+    __properties: ClassVar[List[str]] = ["first_name", "last_name", "contact_type", "display_name", "affiliations", "phones", "emails", "marketing_sources", "data_source", "external_refs_json"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -78,6 +80,13 @@ class ContactCreate(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in affiliations (list)
+        _items = []
+        if self.affiliations:
+            for _item_affiliations in self.affiliations:
+                if _item_affiliations:
+                    _items.append(_item_affiliations.to_dict())
+            _dict['affiliations'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in phones (list)
         _items = []
         if self.phones:
@@ -92,11 +101,6 @@ class ContactCreate(BaseModel):
                 if _item_emails:
                     _items.append(_item_emails.to_dict())
             _dict['emails'] = _items
-        # set to None if organization_uuid (nullable) is None
-        # and model_fields_set contains the field
-        if self.organization_uuid is None and "organization_uuid" in self.model_fields_set:
-            _dict['organization_uuid'] = None
-
         # set to None if display_name (nullable) is None
         # and model_fields_set contains the field
         if self.display_name is None and "display_name" in self.model_fields_set:
@@ -106,6 +110,11 @@ class ContactCreate(BaseModel):
         # and model_fields_set contains the field
         if self.data_source is None and "data_source" in self.model_fields_set:
             _dict['data_source'] = None
+
+        # set to None if external_refs_json (nullable) is None
+        # and model_fields_set contains the field
+        if self.external_refs_json is None and "external_refs_json" in self.model_fields_set:
+            _dict['external_refs_json'] = None
 
         return _dict
 
@@ -122,12 +131,13 @@ class ContactCreate(BaseModel):
             "first_name": obj.get("first_name"),
             "last_name": obj.get("last_name"),
             "contact_type": obj.get("contact_type") if obj.get("contact_type") is not None else 'prospect',
-            "organization_uuid": obj.get("organization_uuid"),
             "display_name": obj.get("display_name"),
+            "affiliations": [InlineAffiliationCreate.from_dict(_item) for _item in obj["affiliations"]] if obj.get("affiliations") is not None else None,
             "phones": [ContactCreatePhone.from_dict(_item) for _item in obj["phones"]] if obj.get("phones") is not None else None,
             "emails": [ContactCreateEmail.from_dict(_item) for _item in obj["emails"]] if obj.get("emails") is not None else None,
             "marketing_sources": obj.get("marketing_sources"),
-            "data_source": obj.get("data_source")
+            "data_source": obj.get("data_source"),
+            "external_refs_json": obj.get("external_refs_json")
         })
         return _obj
 

@@ -1,6 +1,9 @@
 /* tslint:disable */
 /* eslint-disable */
+export * from './AffiliationCreate';
+export * from './AffiliationUpdate';
 export * from './Amount';
+export * from './ApiKeyCreate';
 export * from './CommCreate';
 export * from './ContactCreate';
 export * from './ContactCreateEmail';
@@ -8,6 +11,7 @@ export * from './ContactCreatePhone';
 export * from './ContactUpdate';
 export * from './DiscountAmount';
 export * from './HTTPValidationError';
+export * from './InlineAffiliationCreate';
 export * from './InvoiceCreate';
 export * from './MarketingOptOuts';
 export * from './OrderCreate';
@@ -18,6 +22,8 @@ export * from './PaymentCreate';
 export * from './PreferenceSet';
 export * from './Quantity';
 export * from './SettingsUpdate';
+export * from './SourceCreate';
+export * from './SourceUpdate';
 export * from './StatusChange';
 export * from './Subtotal';
 export * from './TaxAmount';

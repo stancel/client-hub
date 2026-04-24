@@ -59,7 +59,8 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static $openAPITypes = [
         'name' => 'string',
         'org_type' => 'string',
-        'website' => 'string'
+        'website' => 'string',
+        'external_refs_json' => 'array<string,mixed>'
     ];
 
     /**
@@ -72,7 +73,8 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static $openAPIFormats = [
         'name' => null,
         'org_type' => null,
-        'website' => null
+        'website' => null,
+        'external_refs_json' => null
     ];
 
     /**
@@ -83,7 +85,8 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static array $openAPINullables = [
         'name' => false,
         'org_type' => true,
-        'website' => true
+        'website' => true,
+        'external_refs_json' => true
     ];
 
     /**
@@ -174,7 +177,8 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static $attributeMap = [
         'name' => 'name',
         'org_type' => 'org_type',
-        'website' => 'website'
+        'website' => 'website',
+        'external_refs_json' => 'external_refs_json'
     ];
 
     /**
@@ -185,7 +189,8 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static $setters = [
         'name' => 'setName',
         'org_type' => 'setOrgType',
-        'website' => 'setWebsite'
+        'website' => 'setWebsite',
+        'external_refs_json' => 'setExternalRefsJson'
     ];
 
     /**
@@ -196,7 +201,8 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
     protected static $getters = [
         'name' => 'getName',
         'org_type' => 'getOrgType',
-        'website' => 'getWebsite'
+        'website' => 'getWebsite',
+        'external_refs_json' => 'getExternalRefsJson'
     ];
 
     /**
@@ -259,6 +265,7 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('name', $data ?? [], null);
         $this->setIfExists('org_type', $data ?? [], null);
         $this->setIfExists('website', $data ?? [], null);
+        $this->setIfExists('external_refs_json', $data ?? [], null);
     }
 
     /**
@@ -397,6 +404,40 @@ class OrgCreate implements ModelInterface, ArrayAccess, \JsonSerializable
             }
         }
         $this->container['website'] = $website;
+
+        return $this;
+    }
+
+    /**
+     * Gets external_refs_json
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getExternalRefsJson()
+    {
+        return $this->container['external_refs_json'];
+    }
+
+    /**
+     * Sets external_refs_json
+     *
+     * @param array<string,mixed>|null $external_refs_json external_refs_json
+     *
+     * @return self
+     */
+    public function setExternalRefsJson($external_refs_json)
+    {
+        if (is_null($external_refs_json)) {
+            array_push($this->openAPINullablesSetToNull, 'external_refs_json');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('external_refs_json', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
+        }
+        $this->container['external_refs_json'] = $external_refs_json;
 
         return $this;
     }

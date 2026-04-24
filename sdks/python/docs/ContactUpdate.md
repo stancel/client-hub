@@ -9,9 +9,9 @@ Name | Type | Description | Notes
 **last_name** | **str** |  | [optional] 
 **display_name** | **str** |  | [optional] 
 **contact_type** | **str** |  | [optional] 
-**organization_uuid** | **str** |  | [optional] 
 **enrichment_status** | **str** |  | [optional] 
 **notes_text** | **str** |  | [optional] 
+**external_refs_json** | **Dict[str, object]** |  | [optional] 
 
 ## Example
 

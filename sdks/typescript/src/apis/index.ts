@@ -1,5 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
+export * from './AdminApi';
+export * from './AffiliationsApi';
 export * from './CommunicationsApi';
 export * from './ContactsApi';
 export * from './HealthApi';

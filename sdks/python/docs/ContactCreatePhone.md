@@ -8,6 +8,7 @@ Name | Type | Description | Notes
 **number** | **str** |  | 
 **type** | **str** |  | [optional] [default to 'mobile']
 **is_primary** | **bool** |  | [optional] [default to False]
+**affiliation_uuid** | **str** |  | [optional] 
 
 ## Example
 

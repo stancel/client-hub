@@ -39,9 +39,11 @@ class TestContactUpdate(unittest.TestCase):
                 last_name = '',
                 display_name = '',
                 contact_type = '',
-                organization_uuid = '',
                 enrichment_status = '',
-                notes_text = ''
+                notes_text = '',
+                external_refs_json = {
+                    'key' : null
+                    }
             )
         else:
             return ContactUpdate(

@@ -105,4 +105,13 @@ class ContactCreateEmailTest extends TestCase
         // TODO: implement
         self::markTestIncomplete('Not implemented');
     }
+
+    /**
+     * Test attribute "affiliation_uuid"
+     */
+    public function testPropertyAffiliationUuid()
+    {
+        // TODO: implement
+        self::markTestIncomplete('Not implemented');
+    }
 }

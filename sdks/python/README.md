@@ -76,16 +76,17 @@ configuration.api_key['APIKeyHeader'] = os.environ["API_KEY"]
 # Enter a context with an instance of the API client
 with clienthub.ApiClient(configuration) as api_client:
     # Create an instance of the API class
-    api_instance = clienthub.CommunicationsApi(api_client)
-    comm_create = clienthub.CommCreate() # CommCreate | 
+    api_instance = clienthub.AdminApi(api_client)
+    uuid = 'uuid_example' # str | 
+    api_key_create = clienthub.ApiKeyCreate() # ApiKeyCreate | 
 
     try:
-        # Create Communication
-        api_response = api_instance.create_communication_api_v1_communications_post(comm_create)
-        print("The response of CommunicationsApi->create_communication_api_v1_communications_post:\n")
+        # Create Api Key
+        api_response = api_instance.create_api_key_api_v1_admin_sources_uuid_api_keys_post(uuid, api_key_create)
+        print("The response of AdminApi->create_api_key_api_v1_admin_sources_uuid_api_keys_post:\n")
         pprint(api_response)
     except ApiException as e:
-        print("Exception when calling CommunicationsApi->create_communication_api_v1_communications_post: %s\n" % e)
+        print("Exception when calling AdminApi->create_api_key_api_v1_admin_sources_uuid_api_keys_post: %s\n" % e)
 
 ```
 
@@ -95,6 +96,19 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*AdminApi* | [**create_api_key_api_v1_admin_sources_uuid_api_keys_post**](docs/AdminApi.md#create_api_key_api_v1_admin_sources_uuid_api_keys_post) | **POST** /api/v1/admin/sources/{uuid}/api-keys | Create Api Key
+*AdminApi* | [**create_source_api_v1_admin_sources_post**](docs/AdminApi.md#create_source_api_v1_admin_sources_post) | **POST** /api/v1/admin/sources | Create Source
+*AdminApi* | [**delete_source_api_v1_admin_sources_uuid_delete**](docs/AdminApi.md#delete_source_api_v1_admin_sources_uuid_delete) | **DELETE** /api/v1/admin/sources/{uuid} | Delete Source
+*AdminApi* | [**get_source_api_v1_admin_sources_uuid_get**](docs/AdminApi.md#get_source_api_v1_admin_sources_uuid_get) | **GET** /api/v1/admin/sources/{uuid} | Get Source
+*AdminApi* | [**list_api_keys_api_v1_admin_sources_uuid_api_keys_get**](docs/AdminApi.md#list_api_keys_api_v1_admin_sources_uuid_api_keys_get) | **GET** /api/v1/admin/sources/{uuid}/api-keys | List Api Keys
+*AdminApi* | [**list_events_api_v1_admin_events_get**](docs/AdminApi.md#list_events_api_v1_admin_events_get) | **GET** /api/v1/admin/events | List Events
+*AdminApi* | [**list_sources_api_v1_admin_sources_get**](docs/AdminApi.md#list_sources_api_v1_admin_sources_get) | **GET** /api/v1/admin/sources | List Sources
+*AdminApi* | [**revoke_api_key_api_v1_admin_api_keys_uuid_delete**](docs/AdminApi.md#revoke_api_key_api_v1_admin_api_keys_uuid_delete) | **DELETE** /api/v1/admin/api-keys/{uuid} | Revoke Api Key
+*AdminApi* | [**update_source_api_v1_admin_sources_uuid_put**](docs/AdminApi.md#update_source_api_v1_admin_sources_uuid_put) | **PUT** /api/v1/admin/sources/{uuid} | Update Source
+*AffiliationsApi* | [**create_affiliation_endpoint_api_v1_contacts_contact_uuid_affiliations_post**](docs/AffiliationsApi.md#create_affiliation_endpoint_api_v1_contacts_contact_uuid_affiliations_post) | **POST** /api/v1/contacts/{contact_uuid}/affiliations | Create Affiliation Endpoint
+*AffiliationsApi* | [**delete_affiliation_endpoint_api_v1_contacts_contact_uuid_affiliations_affiliation_uuid_delete**](docs/AffiliationsApi.md#delete_affiliation_endpoint_api_v1_contacts_contact_uuid_affiliations_affiliation_uuid_delete) | **DELETE** /api/v1/contacts/{contact_uuid}/affiliations/{affiliation_uuid} | Delete Affiliation Endpoint
+*AffiliationsApi* | [**list_affiliations_endpoint_api_v1_contacts_contact_uuid_affiliations_get**](docs/AffiliationsApi.md#list_affiliations_endpoint_api_v1_contacts_contact_uuid_affiliations_get) | **GET** /api/v1/contacts/{contact_uuid}/affiliations | List Affiliations Endpoint
+*AffiliationsApi* | [**update_affiliation_endpoint_api_v1_contacts_contact_uuid_affiliations_affiliation_uuid_put**](docs/AffiliationsApi.md#update_affiliation_endpoint_api_v1_contacts_contact_uuid_affiliations_affiliation_uuid_put) | **PUT** /api/v1/contacts/{contact_uuid}/affiliations/{affiliation_uuid} | Update Affiliation Endpoint
 *CommunicationsApi* | [**create_communication_api_v1_communications_post**](docs/CommunicationsApi.md#create_communication_api_v1_communications_post) | **POST** /api/v1/communications | Create Communication
 *CommunicationsApi* | [**get_communication_api_v1_communications_uuid_get**](docs/CommunicationsApi.md#get_communication_api_v1_communications_uuid_get) | **GET** /api/v1/communications/{uuid} | Get Communication
 *CommunicationsApi* | [**list_communications_api_v1_communications_get**](docs/CommunicationsApi.md#list_communications_api_v1_communications_get) | **GET** /api/v1/communications | List Communications
@@ -135,7 +149,10 @@ Class | Method | HTTP request | Description
 
 ## Documentation For Models
 
+ - [AffiliationCreate](docs/AffiliationCreate.md)
+ - [AffiliationUpdate](docs/AffiliationUpdate.md)
  - [Amount](docs/Amount.md)
+ - [ApiKeyCreate](docs/ApiKeyCreate.md)
  - [CommCreate](docs/CommCreate.md)
  - [ContactCreate](docs/ContactCreate.md)
  - [ContactCreateEmail](docs/ContactCreateEmail.md)
@@ -143,6 +160,7 @@ Class | Method | HTTP request | Description
  - [ContactUpdate](docs/ContactUpdate.md)
  - [DiscountAmount](docs/DiscountAmount.md)
  - [HTTPValidationError](docs/HTTPValidationError.md)
+ - [InlineAffiliationCreate](docs/InlineAffiliationCreate.md)
  - [InvoiceCreate](docs/InvoiceCreate.md)
  - [MarketingOptOuts](docs/MarketingOptOuts.md)
  - [OrderCreate](docs/OrderCreate.md)
@@ -153,6 +171,8 @@ Class | Method | HTTP request | Description
  - [PreferenceSet](docs/PreferenceSet.md)
  - [Quantity](docs/Quantity.md)
  - [SettingsUpdate](docs/SettingsUpdate.md)
+ - [SourceCreate](docs/SourceCreate.md)
+ - [SourceUpdate](docs/SourceUpdate.md)
  - [StatusChange](docs/StatusChange.md)
  - [Subtotal](docs/Subtotal.md)
  - [TaxAmount](docs/TaxAmount.md)

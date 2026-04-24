@@ -17,6 +17,8 @@
 __version__ = "1.0.0"
 
 # import apis into sdk package
+from clienthub.api.admin_api import AdminApi
+from clienthub.api.affiliations_api import AffiliationsApi
 from clienthub.api.communications_api import CommunicationsApi
 from clienthub.api.contacts_api import ContactsApi
 from clienthub.api.health_api import HealthApi
@@ -39,7 +41,10 @@ from clienthub.exceptions import ApiAttributeError
 from clienthub.exceptions import ApiException
 
 # import models into sdk package
+from clienthub.models.affiliation_create import AffiliationCreate
+from clienthub.models.affiliation_update import AffiliationUpdate
 from clienthub.models.amount import Amount
+from clienthub.models.api_key_create import ApiKeyCreate
 from clienthub.models.comm_create import CommCreate
 from clienthub.models.contact_create import ContactCreate
 from clienthub.models.contact_create_email import ContactCreateEmail
@@ -47,6 +52,7 @@ from clienthub.models.contact_create_phone import ContactCreatePhone
 from clienthub.models.contact_update import ContactUpdate
 from clienthub.models.discount_amount import DiscountAmount
 from clienthub.models.http_validation_error import HTTPValidationError
+from clienthub.models.inline_affiliation_create import InlineAffiliationCreate
 from clienthub.models.invoice_create import InvoiceCreate
 from clienthub.models.marketing_opt_outs import MarketingOptOuts
 from clienthub.models.order_create import OrderCreate
@@ -57,6 +63,8 @@ from clienthub.models.payment_create import PaymentCreate
 from clienthub.models.preference_set import PreferenceSet
 from clienthub.models.quantity import Quantity
 from clienthub.models.settings_update import SettingsUpdate
+from clienthub.models.source_create import SourceCreate
+from clienthub.models.source_update import SourceUpdate
 from clienthub.models.status_change import StatusChange
 from clienthub.models.subtotal import Subtotal
 from clienthub.models.tax_amount import TaxAmount

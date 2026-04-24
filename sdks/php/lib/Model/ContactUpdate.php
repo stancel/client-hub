@@ -61,9 +61,9 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'last_name' => 'string',
         'display_name' => 'string',
         'contact_type' => 'string',
-        'organization_uuid' => 'string',
         'enrichment_status' => 'string',
-        'notes_text' => 'string'
+        'notes_text' => 'string',
+        'external_refs_json' => 'array<string,mixed>'
     ];
 
     /**
@@ -78,9 +78,9 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'last_name' => null,
         'display_name' => null,
         'contact_type' => null,
-        'organization_uuid' => null,
         'enrichment_status' => null,
-        'notes_text' => null
+        'notes_text' => null,
+        'external_refs_json' => null
     ];
 
     /**
@@ -93,9 +93,9 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'last_name' => true,
         'display_name' => true,
         'contact_type' => true,
-        'organization_uuid' => true,
         'enrichment_status' => true,
-        'notes_text' => true
+        'notes_text' => true,
+        'external_refs_json' => true
     ];
 
     /**
@@ -188,9 +188,9 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'last_name' => 'last_name',
         'display_name' => 'display_name',
         'contact_type' => 'contact_type',
-        'organization_uuid' => 'organization_uuid',
         'enrichment_status' => 'enrichment_status',
-        'notes_text' => 'notes_text'
+        'notes_text' => 'notes_text',
+        'external_refs_json' => 'external_refs_json'
     ];
 
     /**
@@ -203,9 +203,9 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'last_name' => 'setLastName',
         'display_name' => 'setDisplayName',
         'contact_type' => 'setContactType',
-        'organization_uuid' => 'setOrganizationUuid',
         'enrichment_status' => 'setEnrichmentStatus',
-        'notes_text' => 'setNotesText'
+        'notes_text' => 'setNotesText',
+        'external_refs_json' => 'setExternalRefsJson'
     ];
 
     /**
@@ -218,9 +218,9 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'last_name' => 'getLastName',
         'display_name' => 'getDisplayName',
         'contact_type' => 'getContactType',
-        'organization_uuid' => 'getOrganizationUuid',
         'enrichment_status' => 'getEnrichmentStatus',
-        'notes_text' => 'getNotesText'
+        'notes_text' => 'getNotesText',
+        'external_refs_json' => 'getExternalRefsJson'
     ];
 
     /**
@@ -284,9 +284,9 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('last_name', $data ?? [], null);
         $this->setIfExists('display_name', $data ?? [], null);
         $this->setIfExists('contact_type', $data ?? [], null);
-        $this->setIfExists('organization_uuid', $data ?? [], null);
         $this->setIfExists('enrichment_status', $data ?? [], null);
         $this->setIfExists('notes_text', $data ?? [], null);
+        $this->setIfExists('external_refs_json', $data ?? [], null);
     }
 
     /**
@@ -468,40 +468,6 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
     }
 
     /**
-     * Gets organization_uuid
-     *
-     * @return string|null
-     */
-    public function getOrganizationUuid()
-    {
-        return $this->container['organization_uuid'];
-    }
-
-    /**
-     * Sets organization_uuid
-     *
-     * @param string|null $organization_uuid organization_uuid
-     *
-     * @return self
-     */
-    public function setOrganizationUuid($organization_uuid)
-    {
-        if (is_null($organization_uuid)) {
-            array_push($this->openAPINullablesSetToNull, 'organization_uuid');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('organization_uuid', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['organization_uuid'] = $organization_uuid;
-
-        return $this;
-    }
-
-    /**
      * Gets enrichment_status
      *
      * @return string|null
@@ -565,6 +531,40 @@ class ContactUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
             }
         }
         $this->container['notes_text'] = $notes_text;
+
+        return $this;
+    }
+
+    /**
+     * Gets external_refs_json
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getExternalRefsJson()
+    {
+        return $this->container['external_refs_json'];
+    }
+
+    /**
+     * Sets external_refs_json
+     *
+     * @param array<string,mixed>|null $external_refs_json external_refs_json
+     *
+     * @return self
+     */
+    public function setExternalRefsJson($external_refs_json)
+    {
+        if (is_null($external_refs_json)) {
+            array_push($this->openAPINullablesSetToNull, 'external_refs_json');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('external_refs_json', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
+        }
+        $this->container['external_refs_json'] = $external_refs_json;
 
         return $this;
     }

@@ -63,6 +63,12 @@ export interface OrderCreate {
      * @memberof OrderCreate
      */
     notesText?: string | null;
+    /**
+     * 
+     * @type {{ [key: string]: any; }}
+     * @memberof OrderCreate
+     */
+    externalRefsJson?: { [key: string]: any; } | null;
 }
 
 /**
@@ -90,6 +96,7 @@ export function OrderCreateFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'scheduledAt': json['scheduled_at'] == null ? undefined : json['scheduled_at'],
         'items': json['items'] == null ? undefined : ((json['items'] as Array<any>).map(OrderItemCreateFromJSON)),
         'notesText': json['notes_text'] == null ? undefined : json['notes_text'],
+        'externalRefsJson': json['external_refs_json'] == null ? undefined : json['external_refs_json'],
     };
 }
 
@@ -110,6 +117,7 @@ export function OrderCreateToJSONTyped(value?: OrderCreate | null, ignoreDiscrim
         'scheduled_at': value['scheduledAt'],
         'items': value['items'] == null ? undefined : ((value['items'] as Array<any>).map(OrderItemCreateToJSON)),
         'notes_text': value['notesText'],
+        'external_refs_json': value['externalRefsJson'],
     };
 }
 

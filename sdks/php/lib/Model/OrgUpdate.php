@@ -60,7 +60,8 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'name' => 'string',
         'org_type' => 'string',
         'website' => 'string',
-        'notes_text' => 'string'
+        'notes_text' => 'string',
+        'external_refs_json' => 'array<string,mixed>'
     ];
 
     /**
@@ -74,7 +75,8 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'name' => null,
         'org_type' => null,
         'website' => null,
-        'notes_text' => null
+        'notes_text' => null,
+        'external_refs_json' => null
     ];
 
     /**
@@ -86,7 +88,8 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'name' => true,
         'org_type' => true,
         'website' => true,
-        'notes_text' => true
+        'notes_text' => true,
+        'external_refs_json' => true
     ];
 
     /**
@@ -178,7 +181,8 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'name' => 'name',
         'org_type' => 'org_type',
         'website' => 'website',
-        'notes_text' => 'notes_text'
+        'notes_text' => 'notes_text',
+        'external_refs_json' => 'external_refs_json'
     ];
 
     /**
@@ -190,7 +194,8 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'name' => 'setName',
         'org_type' => 'setOrgType',
         'website' => 'setWebsite',
-        'notes_text' => 'setNotesText'
+        'notes_text' => 'setNotesText',
+        'external_refs_json' => 'setExternalRefsJson'
     ];
 
     /**
@@ -202,7 +207,8 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         'name' => 'getName',
         'org_type' => 'getOrgType',
         'website' => 'getWebsite',
-        'notes_text' => 'getNotesText'
+        'notes_text' => 'getNotesText',
+        'external_refs_json' => 'getExternalRefsJson'
     ];
 
     /**
@@ -266,6 +272,7 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('org_type', $data ?? [], null);
         $this->setIfExists('website', $data ?? [], null);
         $this->setIfExists('notes_text', $data ?? [], null);
+        $this->setIfExists('external_refs_json', $data ?? [], null);
     }
 
     /**
@@ -442,6 +449,40 @@ class OrgUpdate implements ModelInterface, ArrayAccess, \JsonSerializable
             }
         }
         $this->container['notes_text'] = $notes_text;
+
+        return $this;
+    }
+
+    /**
+     * Gets external_refs_json
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getExternalRefsJson()
+    {
+        return $this->container['external_refs_json'];
+    }
+
+    /**
+     * Sets external_refs_json
+     *
+     * @param array<string,mixed>|null $external_refs_json external_refs_json
+     *
+     * @return self
+     */
+    public function setExternalRefsJson($external_refs_json)
+    {
+        if (is_null($external_refs_json)) {
+            array_push($this->openAPINullablesSetToNull, 'external_refs_json');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('external_refs_json', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
+        }
+        $this->container['external_refs_json'] = $external_refs_json;
 
         return $this;
     }

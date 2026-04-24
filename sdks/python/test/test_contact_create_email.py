@@ -37,7 +37,8 @@ class TestContactCreateEmail(unittest.TestCase):
             return ContactCreateEmail(
                 address = '',
                 type = 'personal',
-                is_primary = True
+                is_primary = True,
+                affiliation_uuid = ''
             )
         else:
             return ContactCreateEmail(

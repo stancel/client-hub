@@ -55,19 +55,20 @@ $config = ClientHub\Configuration::getDefaultConfiguration()->setApiKey('X-API-K
 // $config = ClientHub\Configuration::getDefaultConfiguration()->setApiKeyPrefix('X-API-Key', 'Bearer');
 
 
-$apiInstance = new ClientHub\Api\CommunicationsApi(
+$apiInstance = new ClientHub\Api\AdminApi(
     // If you want use custom http client, pass your client which implements `GuzzleHttp\ClientInterface`.
     // This is optional, `GuzzleHttp\Client` will be used as default.
     new GuzzleHttp\Client(),
     $config
 );
-$comm_create = new \ClientHub\Model\CommCreate(); // \ClientHub\Model\CommCreate
+$uuid = 'uuid_example'; // string
+$api_key_create = new \ClientHub\Model\ApiKeyCreate(); // \ClientHub\Model\ApiKeyCreate
 
 try {
-    $result = $apiInstance->createCommunicationApiV1CommunicationsPost($comm_create);
+    $result = $apiInstance->createApiKeyApiV1AdminSourcesUuidApiKeysPost($uuid, $api_key_create);
     print_r($result);
 } catch (Exception $e) {
-    echo 'Exception when calling CommunicationsApi->createCommunicationApiV1CommunicationsPost: ', $e->getMessage(), PHP_EOL;
+    echo 'Exception when calling AdminApi->createApiKeyApiV1AdminSourcesUuidApiKeysPost: ', $e->getMessage(), PHP_EOL;
 }
 
 ```
@@ -78,6 +79,19 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*AdminApi* | [**createApiKeyApiV1AdminSourcesUuidApiKeysPost**](docs/Api/AdminApi.md#createapikeyapiv1adminsourcesuuidapikeyspost) | **POST** /api/v1/admin/sources/{uuid}/api-keys | Create Api Key
+*AdminApi* | [**createSourceApiV1AdminSourcesPost**](docs/Api/AdminApi.md#createsourceapiv1adminsourcespost) | **POST** /api/v1/admin/sources | Create Source
+*AdminApi* | [**deleteSourceApiV1AdminSourcesUuidDelete**](docs/Api/AdminApi.md#deletesourceapiv1adminsourcesuuiddelete) | **DELETE** /api/v1/admin/sources/{uuid} | Delete Source
+*AdminApi* | [**getSourceApiV1AdminSourcesUuidGet**](docs/Api/AdminApi.md#getsourceapiv1adminsourcesuuidget) | **GET** /api/v1/admin/sources/{uuid} | Get Source
+*AdminApi* | [**listApiKeysApiV1AdminSourcesUuidApiKeysGet**](docs/Api/AdminApi.md#listapikeysapiv1adminsourcesuuidapikeysget) | **GET** /api/v1/admin/sources/{uuid}/api-keys | List Api Keys
+*AdminApi* | [**listEventsApiV1AdminEventsGet**](docs/Api/AdminApi.md#listeventsapiv1admineventsget) | **GET** /api/v1/admin/events | List Events
+*AdminApi* | [**listSourcesApiV1AdminSourcesGet**](docs/Api/AdminApi.md#listsourcesapiv1adminsourcesget) | **GET** /api/v1/admin/sources | List Sources
+*AdminApi* | [**revokeApiKeyApiV1AdminApiKeysUuidDelete**](docs/Api/AdminApi.md#revokeapikeyapiv1adminapikeysuuiddelete) | **DELETE** /api/v1/admin/api-keys/{uuid} | Revoke Api Key
+*AdminApi* | [**updateSourceApiV1AdminSourcesUuidPut**](docs/Api/AdminApi.md#updatesourceapiv1adminsourcesuuidput) | **PUT** /api/v1/admin/sources/{uuid} | Update Source
+*AffiliationsApi* | [**createAffiliationEndpointApiV1ContactsContactUuidAffiliationsPost**](docs/Api/AffiliationsApi.md#createaffiliationendpointapiv1contactscontactuuidaffiliationspost) | **POST** /api/v1/contacts/{contact_uuid}/affiliations | Create Affiliation Endpoint
+*AffiliationsApi* | [**deleteAffiliationEndpointApiV1ContactsContactUuidAffiliationsAffiliationUuidDelete**](docs/Api/AffiliationsApi.md#deleteaffiliationendpointapiv1contactscontactuuidaffiliationsaffiliationuuiddelete) | **DELETE** /api/v1/contacts/{contact_uuid}/affiliations/{affiliation_uuid} | Delete Affiliation Endpoint
+*AffiliationsApi* | [**listAffiliationsEndpointApiV1ContactsContactUuidAffiliationsGet**](docs/Api/AffiliationsApi.md#listaffiliationsendpointapiv1contactscontactuuidaffiliationsget) | **GET** /api/v1/contacts/{contact_uuid}/affiliations | List Affiliations Endpoint
+*AffiliationsApi* | [**updateAffiliationEndpointApiV1ContactsContactUuidAffiliationsAffiliationUuidPut**](docs/Api/AffiliationsApi.md#updateaffiliationendpointapiv1contactscontactuuidaffiliationsaffiliationuuidput) | **PUT** /api/v1/contacts/{contact_uuid}/affiliations/{affiliation_uuid} | Update Affiliation Endpoint
 *CommunicationsApi* | [**createCommunicationApiV1CommunicationsPost**](docs/Api/CommunicationsApi.md#createcommunicationapiv1communicationspost) | **POST** /api/v1/communications | Create Communication
 *CommunicationsApi* | [**getCommunicationApiV1CommunicationsUuidGet**](docs/Api/CommunicationsApi.md#getcommunicationapiv1communicationsuuidget) | **GET** /api/v1/communications/{uuid} | Get Communication
 *CommunicationsApi* | [**listCommunicationsApiV1CommunicationsGet**](docs/Api/CommunicationsApi.md#listcommunicationsapiv1communicationsget) | **GET** /api/v1/communications | List Communications
@@ -117,7 +131,10 @@ Class | Method | HTTP request | Description
 
 ## Models
 
+- [AffiliationCreate](docs/Model/AffiliationCreate.md)
+- [AffiliationUpdate](docs/Model/AffiliationUpdate.md)
 - [Amount](docs/Model/Amount.md)
+- [ApiKeyCreate](docs/Model/ApiKeyCreate.md)
 - [CommCreate](docs/Model/CommCreate.md)
 - [ContactCreate](docs/Model/ContactCreate.md)
 - [ContactCreateEmail](docs/Model/ContactCreateEmail.md)
@@ -125,6 +142,7 @@ Class | Method | HTTP request | Description
 - [ContactUpdate](docs/Model/ContactUpdate.md)
 - [DiscountAmount](docs/Model/DiscountAmount.md)
 - [HTTPValidationError](docs/Model/HTTPValidationError.md)
+- [InlineAffiliationCreate](docs/Model/InlineAffiliationCreate.md)
 - [InvoiceCreate](docs/Model/InvoiceCreate.md)
 - [MarketingOptOuts](docs/Model/MarketingOptOuts.md)
 - [OrderCreate](docs/Model/OrderCreate.md)
@@ -135,6 +153,8 @@ Class | Method | HTTP request | Description
 - [PreferenceSet](docs/Model/PreferenceSet.md)
 - [Quantity](docs/Model/Quantity.md)
 - [SettingsUpdate](docs/Model/SettingsUpdate.md)
+- [SourceCreate](docs/Model/SourceCreate.md)
+- [SourceUpdate](docs/Model/SourceUpdate.md)
 - [StatusChange](docs/Model/StatusChange.md)
 - [Subtotal](docs/Model/Subtotal.md)
 - [TaxAmount](docs/Model/TaxAmount.md)

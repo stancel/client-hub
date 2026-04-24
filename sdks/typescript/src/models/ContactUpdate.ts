@@ -48,12 +48,6 @@ export interface ContactUpdate {
      * @type {string}
      * @memberof ContactUpdate
      */
-    organizationUuid?: string | null;
-    /**
-     * 
-     * @type {string}
-     * @memberof ContactUpdate
-     */
     enrichmentStatus?: string | null;
     /**
      * 
@@ -61,6 +55,12 @@ export interface ContactUpdate {
      * @memberof ContactUpdate
      */
     notesText?: string | null;
+    /**
+     * 
+     * @type {{ [key: string]: any; }}
+     * @memberof ContactUpdate
+     */
+    externalRefsJson?: { [key: string]: any; } | null;
 }
 
 /**
@@ -84,9 +84,9 @@ export function ContactUpdateFromJSONTyped(json: any, ignoreDiscriminator: boole
         'lastName': json['last_name'] == null ? undefined : json['last_name'],
         'displayName': json['display_name'] == null ? undefined : json['display_name'],
         'contactType': json['contact_type'] == null ? undefined : json['contact_type'],
-        'organizationUuid': json['organization_uuid'] == null ? undefined : json['organization_uuid'],
         'enrichmentStatus': json['enrichment_status'] == null ? undefined : json['enrichment_status'],
         'notesText': json['notes_text'] == null ? undefined : json['notes_text'],
+        'externalRefsJson': json['external_refs_json'] == null ? undefined : json['external_refs_json'],
     };
 }
 
@@ -105,9 +105,9 @@ export function ContactUpdateToJSONTyped(value?: ContactUpdate | null, ignoreDis
         'last_name': value['lastName'],
         'display_name': value['displayName'],
         'contact_type': value['contactType'],
-        'organization_uuid': value['organizationUuid'],
         'enrichment_status': value['enrichmentStatus'],
         'notes_text': value['notesText'],
+        'external_refs_json': value['externalRefsJson'],
     };
 }
 

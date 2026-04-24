@@ -29,7 +29,8 @@ class ContactCreateEmail(BaseModel):
     address: StrictStr
     type: Optional[StrictStr] = 'personal'
     is_primary: Optional[StrictBool] = False
-    __properties: ClassVar[List[str]] = ["address", "type", "is_primary"]
+    affiliation_uuid: Optional[StrictStr] = None
+    __properties: ClassVar[List[str]] = ["address", "type", "is_primary", "affiliation_uuid"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -70,6 +71,11 @@ class ContactCreateEmail(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # set to None if affiliation_uuid (nullable) is None
+        # and model_fields_set contains the field
+        if self.affiliation_uuid is None and "affiliation_uuid" in self.model_fields_set:
+            _dict['affiliation_uuid'] = None
+
         return _dict
 
     @classmethod
@@ -84,7 +90,8 @@ class ContactCreateEmail(BaseModel):
         _obj = cls.model_validate({
             "address": obj.get("address"),
             "type": obj.get("type") if obj.get("type") is not None else 'personal',
-            "is_primary": obj.get("is_primary") if obj.get("is_primary") is not None else False
+            "is_primary": obj.get("is_primary") if obj.get("is_primary") is not None else False,
+            "affiliation_uuid": obj.get("affiliation_uuid")
         })
         return _obj
 

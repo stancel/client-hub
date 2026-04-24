@@ -107,18 +107,18 @@ class ContactCreateTest extends TestCase
     }
 
     /**
-     * Test attribute "organization_uuid"
+     * Test attribute "display_name"
      */
-    public function testPropertyOrganizationUuid()
+    public function testPropertyDisplayName()
     {
         // TODO: implement
         self::markTestIncomplete('Not implemented');
     }
 
     /**
-     * Test attribute "display_name"
+     * Test attribute "affiliations"
      */
-    public function testPropertyDisplayName()
+    public function testPropertyAffiliations()
     {
         // TODO: implement
         self::markTestIncomplete('Not implemented');
@@ -155,6 +155,15 @@ class ContactCreateTest extends TestCase
      * Test attribute "data_source"
      */
     public function testPropertyDataSource()
+    {
+        // TODO: implement
+        self::markTestIncomplete('Not implemented');
+    }
+
+    /**
+     * Test attribute "external_refs_json"
+     */
+    public function testPropertyExternalRefsJson()
     {
         // TODO: implement
         self::markTestIncomplete('Not implemented');

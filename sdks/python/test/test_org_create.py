@@ -37,7 +37,10 @@ class TestOrgCreate(unittest.TestCase):
             return OrgCreate(
                 name = '',
                 org_type = '',
-                website = ''
+                website = '',
+                external_refs_json = {
+                    'key' : null
+                    }
             )
         else:
             return OrgCreate(

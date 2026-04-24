@@ -37,7 +37,8 @@ class TestContactCreatePhone(unittest.TestCase):
             return ContactCreatePhone(
                 number = '',
                 type = 'mobile',
-                is_primary = True
+                is_primary = True,
+                affiliation_uuid = ''
             )
         else:
             return ContactCreatePhone(

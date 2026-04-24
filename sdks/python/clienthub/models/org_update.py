@@ -30,7 +30,8 @@ class OrgUpdate(BaseModel):
     org_type: Optional[StrictStr] = None
     website: Optional[StrictStr] = None
     notes_text: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["name", "org_type", "website", "notes_text"]
+    external_refs_json: Optional[Dict[str, Any]] = None
+    __properties: ClassVar[List[str]] = ["name", "org_type", "website", "notes_text", "external_refs_json"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -91,6 +92,11 @@ class OrgUpdate(BaseModel):
         if self.notes_text is None and "notes_text" in self.model_fields_set:
             _dict['notes_text'] = None
 
+        # set to None if external_refs_json (nullable) is None
+        # and model_fields_set contains the field
+        if self.external_refs_json is None and "external_refs_json" in self.model_fields_set:
+            _dict['external_refs_json'] = None
+
         return _dict
 
     @classmethod
@@ -106,7 +112,8 @@ class OrgUpdate(BaseModel):
             "name": obj.get("name"),
             "org_type": obj.get("org_type"),
             "website": obj.get("website"),
-            "notes_text": obj.get("notes_text")
+            "notes_text": obj.get("notes_text"),
+            "external_refs_json": obj.get("external_refs_json")
         })
         return _obj
 

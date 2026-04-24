@@ -20,6 +20,13 @@ import {
     ContactCreatePhoneToJSON,
     ContactCreatePhoneToJSONTyped,
 } from './ContactCreatePhone';
+import type { InlineAffiliationCreate } from './InlineAffiliationCreate';
+import {
+    InlineAffiliationCreateFromJSON,
+    InlineAffiliationCreateFromJSONTyped,
+    InlineAffiliationCreateToJSON,
+    InlineAffiliationCreateToJSONTyped,
+} from './InlineAffiliationCreate';
 import type { ContactCreateEmail } from './ContactCreateEmail';
 import {
     ContactCreateEmailFromJSON,
@@ -57,13 +64,13 @@ export interface ContactCreate {
      * @type {string}
      * @memberof ContactCreate
      */
-    organizationUuid?: string | null;
+    displayName?: string | null;
     /**
      * 
-     * @type {string}
+     * @type {Array<InlineAffiliationCreate>}
      * @memberof ContactCreate
      */
-    displayName?: string | null;
+    affiliations?: Array<InlineAffiliationCreate>;
     /**
      * 
      * @type {Array<ContactCreatePhone>}
@@ -88,6 +95,12 @@ export interface ContactCreate {
      * @memberof ContactCreate
      */
     dataSource?: string | null;
+    /**
+     * 
+     * @type {{ [key: string]: any; }}
+     * @memberof ContactCreate
+     */
+    externalRefsJson?: { [key: string]: any; } | null;
 }
 
 /**
@@ -112,12 +125,13 @@ export function ContactCreateFromJSONTyped(json: any, ignoreDiscriminator: boole
         'firstName': json['first_name'],
         'lastName': json['last_name'],
         'contactType': json['contact_type'] == null ? undefined : json['contact_type'],
-        'organizationUuid': json['organization_uuid'] == null ? undefined : json['organization_uuid'],
         'displayName': json['display_name'] == null ? undefined : json['display_name'],
+        'affiliations': json['affiliations'] == null ? undefined : ((json['affiliations'] as Array<any>).map(InlineAffiliationCreateFromJSON)),
         'phones': json['phones'] == null ? undefined : ((json['phones'] as Array<any>).map(ContactCreatePhoneFromJSON)),
         'emails': json['emails'] == null ? undefined : ((json['emails'] as Array<any>).map(ContactCreateEmailFromJSON)),
         'marketingSources': json['marketing_sources'] == null ? undefined : json['marketing_sources'],
         'dataSource': json['data_source'] == null ? undefined : json['data_source'],
+        'externalRefsJson': json['external_refs_json'] == null ? undefined : json['external_refs_json'],
     };
 }
 
@@ -135,12 +149,13 @@ export function ContactCreateToJSONTyped(value?: ContactCreate | null, ignoreDis
         'first_name': value['firstName'],
         'last_name': value['lastName'],
         'contact_type': value['contactType'],
-        'organization_uuid': value['organizationUuid'],
         'display_name': value['displayName'],
+        'affiliations': value['affiliations'] == null ? undefined : ((value['affiliations'] as Array<any>).map(InlineAffiliationCreateToJSON)),
         'phones': value['phones'] == null ? undefined : ((value['phones'] as Array<any>).map(ContactCreatePhoneToJSON)),
         'emails': value['emails'] == null ? undefined : ((value['emails'] as Array<any>).map(ContactCreateEmailToJSON)),
         'marketing_sources': value['marketingSources'],
         'data_source': value['dataSource'],
+        'external_refs_json': value['externalRefsJson'],
     };
 }
 

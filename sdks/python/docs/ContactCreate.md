@@ -8,12 +8,13 @@ Name | Type | Description | Notes
 **first_name** | **str** |  | 
 **last_name** | **str** |  | 
 **contact_type** | **str** |  | [optional] [default to 'prospect']
-**organization_uuid** | **str** |  | [optional] 
 **display_name** | **str** |  | [optional] 
+**affiliations** | [**List[InlineAffiliationCreate]**](InlineAffiliationCreate.md) |  | [optional] [default to []]
 **phones** | [**List[ContactCreatePhone]**](ContactCreatePhone.md) |  | [optional] [default to []]
 **emails** | [**List[ContactCreateEmail]**](ContactCreateEmail.md) |  | [optional] [default to []]
 **marketing_sources** | **List[str]** |  | [optional] [default to []]
 **data_source** | **str** |  | [optional] 
+**external_refs_json** | **Dict[str, object]** |  | [optional] 
 
 ## Example
 

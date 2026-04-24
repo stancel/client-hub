@@ -33,7 +33,8 @@ class OrderCreate(BaseModel):
     scheduled_at: Optional[StrictStr] = None
     items: Optional[List[OrderItemCreate]] = None
     notes_text: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["contact_uuid", "order_date", "due_date", "scheduled_at", "items", "notes_text"]
+    external_refs_json: Optional[Dict[str, Any]] = None
+    __properties: ClassVar[List[str]] = ["contact_uuid", "order_date", "due_date", "scheduled_at", "items", "notes_text", "external_refs_json"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -96,6 +97,11 @@ class OrderCreate(BaseModel):
         if self.notes_text is None and "notes_text" in self.model_fields_set:
             _dict['notes_text'] = None
 
+        # set to None if external_refs_json (nullable) is None
+        # and model_fields_set contains the field
+        if self.external_refs_json is None and "external_refs_json" in self.model_fields_set:
+            _dict['external_refs_json'] = None
+
         return _dict
 
     @classmethod
@@ -113,7 +119,8 @@ class OrderCreate(BaseModel):
             "due_date": obj.get("due_date"),
             "scheduled_at": obj.get("scheduled_at"),
             "items": [OrderItemCreate.from_dict(_item) for _item in obj["items"]] if obj.get("items") is not None else None,
-            "notes_text": obj.get("notes_text")
+            "notes_text": obj.get("notes_text"),
+            "external_refs_json": obj.get("external_refs_json")
         })
         return _obj
 

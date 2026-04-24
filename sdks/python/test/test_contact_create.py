@@ -38,24 +38,39 @@ class TestContactCreate(unittest.TestCase):
                 first_name = '',
                 last_name = '',
                 contact_type = 'prospect',
-                organization_uuid = '',
                 display_name = '',
+                affiliations = [
+                    clienthub.models.inline_affiliation_create.InlineAffiliationCreate(
+                        organization_uuid = '', 
+                        role_title = '', 
+                        department = '', 
+                        seniority = '', 
+                        is_decision_maker = True, 
+                        is_primary = True, 
+                        start_date = datetime.datetime.strptime('1975-12-30', '%Y-%m-%d').date(), 
+                        end_date = datetime.datetime.strptime('1975-12-30', '%Y-%m-%d').date(), )
+                    ],
                 phones = [
                     clienthub.models.contact_create_phone.ContactCreatePhone(
                         number = '', 
                         type = 'mobile', 
-                        is_primary = True, )
+                        is_primary = True, 
+                        affiliation_uuid = '', )
                     ],
                 emails = [
                     clienthub.models.contact_create_email.ContactCreateEmail(
                         address = '', 
                         type = 'personal', 
-                        is_primary = True, )
+                        is_primary = True, 
+                        affiliation_uuid = '', )
                     ],
                 marketing_sources = [
                     ''
                     ],
-                data_source = ''
+                data_source = '',
+                external_refs_json = {
+                    'key' : null
+                    }
             )
         else:
             return ContactCreate(

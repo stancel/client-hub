@@ -6,6 +6,8 @@
 README.md
 clienthub/__init__.py
 clienthub/api/__init__.py
+clienthub/api/admin_api.py
+clienthub/api/affiliations_api.py
 clienthub/api/communications_api.py
 clienthub/api/contacts_api.py
 clienthub/api/health_api.py
@@ -20,7 +22,10 @@ clienthub/api_response.py
 clienthub/configuration.py
 clienthub/exceptions.py
 clienthub/models/__init__.py
+clienthub/models/affiliation_create.py
+clienthub/models/affiliation_update.py
 clienthub/models/amount.py
+clienthub/models/api_key_create.py
 clienthub/models/comm_create.py
 clienthub/models/contact_create.py
 clienthub/models/contact_create_email.py
@@ -28,6 +33,7 @@ clienthub/models/contact_create_phone.py
 clienthub/models/contact_update.py
 clienthub/models/discount_amount.py
 clienthub/models/http_validation_error.py
+clienthub/models/inline_affiliation_create.py
 clienthub/models/invoice_create.py
 clienthub/models/marketing_opt_outs.py
 clienthub/models/order_create.py
@@ -38,6 +44,8 @@ clienthub/models/payment_create.py
 clienthub/models/preference_set.py
 clienthub/models/quantity.py
 clienthub/models/settings_update.py
+clienthub/models/source_create.py
+clienthub/models/source_update.py
 clienthub/models/status_change.py
 clienthub/models/subtotal.py
 clienthub/models/tax_amount.py
@@ -46,7 +54,12 @@ clienthub/models/validation_error.py
 clienthub/models/validation_error_loc_inner.py
 clienthub/py.typed
 clienthub/rest.py
+docs/AdminApi.md
+docs/AffiliationCreate.md
+docs/AffiliationUpdate.md
+docs/AffiliationsApi.md
 docs/Amount.md
+docs/ApiKeyCreate.md
 docs/CommCreate.md
 docs/CommunicationsApi.md
 docs/ContactCreate.md
@@ -57,6 +70,7 @@ docs/ContactsApi.md
 docs/DiscountAmount.md
 docs/HTTPValidationError.md
 docs/HealthApi.md
+docs/InlineAffiliationCreate.md
 docs/InvoiceCreate.md
 docs/InvoicesApi.md
 docs/LookupApi.md
@@ -72,6 +86,8 @@ docs/PreferenceSet.md
 docs/Quantity.md
 docs/SettingsApi.md
 docs/SettingsUpdate.md
+docs/SourceCreate.md
+docs/SourceUpdate.md
 docs/StatusChange.md
 docs/Subtotal.md
 docs/TaxAmount.md
@@ -86,7 +102,12 @@ setup.cfg
 setup.py
 test-requirements.txt
 test/__init__.py
+test/test_admin_api.py
+test/test_affiliation_create.py
+test/test_affiliation_update.py
+test/test_affiliations_api.py
 test/test_amount.py
+test/test_api_key_create.py
 test/test_comm_create.py
 test/test_communications_api.py
 test/test_contact_create.py
@@ -97,6 +118,7 @@ test/test_contacts_api.py
 test/test_discount_amount.py
 test/test_health_api.py
 test/test_http_validation_error.py
+test/test_inline_affiliation_create.py
 test/test_invoice_create.py
 test/test_invoices_api.py
 test/test_lookup_api.py
@@ -112,6 +134,8 @@ test/test_preference_set.py
 test/test_quantity.py
 test/test_settings_api.py
 test/test_settings_update.py
+test/test_source_create.py
+test/test_source_update.py
 test/test_status_change.py
 test/test_subtotal.py
 test/test_tax_amount.py

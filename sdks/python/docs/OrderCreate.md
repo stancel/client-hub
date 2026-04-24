@@ -11,6 +11,7 @@ Name | Type | Description | Notes
 **scheduled_at** | **str** |  | [optional] 
 **items** | [**List[OrderItemCreate]**](OrderItemCreate.md) |  | [optional] [default to []]
 **notes_text** | **str** |  | [optional] 
+**external_refs_json** | **Dict[str, object]** |  | [optional] 
 
 ## Example
 

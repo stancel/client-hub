@@ -37,6 +37,12 @@ export interface OrgCreate {
      * @memberof OrgCreate
      */
     website?: string | null;
+    /**
+     * 
+     * @type {{ [key: string]: any; }}
+     * @memberof OrgCreate
+     */
+    externalRefsJson?: { [key: string]: any; } | null;
 }
 
 /**
@@ -60,6 +66,7 @@ export function OrgCreateFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'name': json['name'],
         'orgType': json['org_type'] == null ? undefined : json['org_type'],
         'website': json['website'] == null ? undefined : json['website'],
+        'externalRefsJson': json['external_refs_json'] == null ? undefined : json['external_refs_json'],
     };
 }
 
@@ -77,6 +84,7 @@ export function OrgCreateToJSONTyped(value?: OrgCreate | null, ignoreDiscriminat
         'name': value['name'],
         'org_type': value['orgType'],
         'website': value['website'],
+        'external_refs_json': value['externalRefsJson'],
     };
 }
 

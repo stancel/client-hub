@@ -9,6 +9,7 @@ Name | Type | Description | Notes
 **org_type** | **str** |  | [optional] 
 **website** | **str** |  | [optional] 
 **notes_text** | **str** |  | [optional] 
+**external_refs_json** | **Dict[str, object]** |  | [optional] 
 
 ## Example
 

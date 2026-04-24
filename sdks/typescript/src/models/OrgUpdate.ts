@@ -43,6 +43,12 @@ export interface OrgUpdate {
      * @memberof OrgUpdate
      */
     notesText?: string | null;
+    /**
+     * 
+     * @type {{ [key: string]: any; }}
+     * @memberof OrgUpdate
+     */
+    externalRefsJson?: { [key: string]: any; } | null;
 }
 
 /**
@@ -66,6 +72,7 @@ export function OrgUpdateFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'orgType': json['org_type'] == null ? undefined : json['org_type'],
         'website': json['website'] == null ? undefined : json['website'],
         'notesText': json['notes_text'] == null ? undefined : json['notes_text'],
+        'externalRefsJson': json['external_refs_json'] == null ? undefined : json['external_refs_json'],
     };
 }
 
@@ -84,6 +91,7 @@ export function OrgUpdateToJSONTyped(value?: OrgUpdate | null, ignoreDiscriminat
         'org_type': value['orgType'],
         'website': value['website'],
         'notes_text': value['notesText'],
+        'external_refs_json': value['externalRefsJson'],
     };
 }
 

@@ -1,6 +1,8 @@
 # flake8: noqa
 
 # import apis into api package
+from clienthub.api.admin_api import AdminApi
+from clienthub.api.affiliations_api import AffiliationsApi
 from clienthub.api.communications_api import CommunicationsApi
 from clienthub.api.contacts_api import ContactsApi
 from clienthub.api.health_api import HealthApi

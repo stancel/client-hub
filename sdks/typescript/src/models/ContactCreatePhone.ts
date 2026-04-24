@@ -37,6 +37,12 @@ export interface ContactCreatePhone {
      * @memberof ContactCreatePhone
      */
     isPrimary?: boolean;
+    /**
+     * 
+     * @type {string}
+     * @memberof ContactCreatePhone
+     */
+    affiliationUuid?: string | null;
 }
 
 /**
@@ -60,6 +66,7 @@ export function ContactCreatePhoneFromJSONTyped(json: any, ignoreDiscriminator: 
         'number': json['number'],
         'type': json['type'] == null ? undefined : json['type'],
         'isPrimary': json['is_primary'] == null ? undefined : json['is_primary'],
+        'affiliationUuid': json['affiliation_uuid'] == null ? undefined : json['affiliation_uuid'],
     };
 }
 
@@ -77,6 +84,7 @@ export function ContactCreatePhoneToJSONTyped(value?: ContactCreatePhone | null,
         'number': value['number'],
         'type': value['type'],
         'is_primary': value['isPrimary'],
+        'affiliation_uuid': value['affiliationUuid'],
     };
 }
 

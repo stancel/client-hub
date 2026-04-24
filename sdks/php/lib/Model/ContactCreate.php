@@ -60,12 +60,13 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'first_name' => 'string',
         'last_name' => 'string',
         'contact_type' => 'string',
-        'organization_uuid' => 'string',
         'display_name' => 'string',
+        'affiliations' => '\ClientHub\Model\InlineAffiliationCreate[]',
         'phones' => '\ClientHub\Model\ContactCreatePhone[]',
         'emails' => '\ClientHub\Model\ContactCreateEmail[]',
         'marketing_sources' => 'string[]',
-        'data_source' => 'string'
+        'data_source' => 'string',
+        'external_refs_json' => 'array<string,mixed>'
     ];
 
     /**
@@ -79,12 +80,13 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'first_name' => null,
         'last_name' => null,
         'contact_type' => null,
-        'organization_uuid' => null,
         'display_name' => null,
+        'affiliations' => null,
         'phones' => null,
         'emails' => null,
         'marketing_sources' => null,
-        'data_source' => null
+        'data_source' => null,
+        'external_refs_json' => null
     ];
 
     /**
@@ -96,12 +98,13 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'first_name' => false,
         'last_name' => false,
         'contact_type' => false,
-        'organization_uuid' => true,
         'display_name' => true,
+        'affiliations' => false,
         'phones' => false,
         'emails' => false,
         'marketing_sources' => false,
-        'data_source' => true
+        'data_source' => true,
+        'external_refs_json' => true
     ];
 
     /**
@@ -193,12 +196,13 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'first_name' => 'first_name',
         'last_name' => 'last_name',
         'contact_type' => 'contact_type',
-        'organization_uuid' => 'organization_uuid',
         'display_name' => 'display_name',
+        'affiliations' => 'affiliations',
         'phones' => 'phones',
         'emails' => 'emails',
         'marketing_sources' => 'marketing_sources',
-        'data_source' => 'data_source'
+        'data_source' => 'data_source',
+        'external_refs_json' => 'external_refs_json'
     ];
 
     /**
@@ -210,12 +214,13 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'first_name' => 'setFirstName',
         'last_name' => 'setLastName',
         'contact_type' => 'setContactType',
-        'organization_uuid' => 'setOrganizationUuid',
         'display_name' => 'setDisplayName',
+        'affiliations' => 'setAffiliations',
         'phones' => 'setPhones',
         'emails' => 'setEmails',
         'marketing_sources' => 'setMarketingSources',
-        'data_source' => 'setDataSource'
+        'data_source' => 'setDataSource',
+        'external_refs_json' => 'setExternalRefsJson'
     ];
 
     /**
@@ -227,12 +232,13 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         'first_name' => 'getFirstName',
         'last_name' => 'getLastName',
         'contact_type' => 'getContactType',
-        'organization_uuid' => 'getOrganizationUuid',
         'display_name' => 'getDisplayName',
+        'affiliations' => 'getAffiliations',
         'phones' => 'getPhones',
         'emails' => 'getEmails',
         'marketing_sources' => 'getMarketingSources',
-        'data_source' => 'getDataSource'
+        'data_source' => 'getDataSource',
+        'external_refs_json' => 'getExternalRefsJson'
     ];
 
     /**
@@ -295,12 +301,13 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
         $this->setIfExists('first_name', $data ?? [], null);
         $this->setIfExists('last_name', $data ?? [], null);
         $this->setIfExists('contact_type', $data ?? [], 'prospect');
-        $this->setIfExists('organization_uuid', $data ?? [], null);
         $this->setIfExists('display_name', $data ?? [], null);
+        $this->setIfExists('affiliations', $data ?? [], null);
         $this->setIfExists('phones', $data ?? [], null);
         $this->setIfExists('emails', $data ?? [], null);
         $this->setIfExists('marketing_sources', $data ?? [], null);
         $this->setIfExists('data_source', $data ?? [], null);
+        $this->setIfExists('external_refs_json', $data ?? [], null);
     }
 
     /**
@@ -433,40 +440,6 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
     }
 
     /**
-     * Gets organization_uuid
-     *
-     * @return string|null
-     */
-    public function getOrganizationUuid()
-    {
-        return $this->container['organization_uuid'];
-    }
-
-    /**
-     * Sets organization_uuid
-     *
-     * @param string|null $organization_uuid organization_uuid
-     *
-     * @return self
-     */
-    public function setOrganizationUuid($organization_uuid)
-    {
-        if (is_null($organization_uuid)) {
-            array_push($this->openAPINullablesSetToNull, 'organization_uuid');
-        } else {
-            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
-            $index = array_search('organization_uuid', $nullablesSetToNull);
-            if ($index !== FALSE) {
-                unset($nullablesSetToNull[$index]);
-                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
-            }
-        }
-        $this->container['organization_uuid'] = $organization_uuid;
-
-        return $this;
-    }
-
-    /**
      * Gets display_name
      *
      * @return string|null
@@ -496,6 +469,33 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
             }
         }
         $this->container['display_name'] = $display_name;
+
+        return $this;
+    }
+
+    /**
+     * Gets affiliations
+     *
+     * @return \ClientHub\Model\InlineAffiliationCreate[]|null
+     */
+    public function getAffiliations()
+    {
+        return $this->container['affiliations'];
+    }
+
+    /**
+     * Sets affiliations
+     *
+     * @param \ClientHub\Model\InlineAffiliationCreate[]|null $affiliations affiliations
+     *
+     * @return self
+     */
+    public function setAffiliations($affiliations)
+    {
+        if (is_null($affiliations)) {
+            throw new \InvalidArgumentException('non-nullable affiliations cannot be null');
+        }
+        $this->container['affiliations'] = $affiliations;
 
         return $this;
     }
@@ -611,6 +611,40 @@ class ContactCreate implements ModelInterface, ArrayAccess, \JsonSerializable
             }
         }
         $this->container['data_source'] = $data_source;
+
+        return $this;
+    }
+
+    /**
+     * Gets external_refs_json
+     *
+     * @return array<string,mixed>|null
+     */
+    public function getExternalRefsJson()
+    {
+        return $this->container['external_refs_json'];
+    }
+
+    /**
+     * Sets external_refs_json
+     *
+     * @param array<string,mixed>|null $external_refs_json external_refs_json
+     *
+     * @return self
+     */
+    public function setExternalRefsJson($external_refs_json)
+    {
+        if (is_null($external_refs_json)) {
+            array_push($this->openAPINullablesSetToNull, 'external_refs_json');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('external_refs_json', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
+        }
+        $this->container['external_refs_json'] = $external_refs_json;
 
         return $this;
     }

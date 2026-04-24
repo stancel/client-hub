@@ -8,6 +8,7 @@ Name | Type | Description | Notes
 **name** | **str** |  | 
 **org_type** | **str** |  | [optional] 
 **website** | **str** |  | [optional] 
+**external_refs_json** | **Dict[str, object]** |  | [optional] 
 
 ## Example
 

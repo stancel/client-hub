@@ -38,7 +38,10 @@ class TestOrgUpdate(unittest.TestCase):
                 name = '',
                 org_type = '',
                 website = '',
-                notes_text = ''
+                notes_text = '',
+                external_refs_json = {
+                    'key' : null
+                    }
             )
         else:
             return OrgUpdate(

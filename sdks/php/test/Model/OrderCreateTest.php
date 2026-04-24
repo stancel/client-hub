@@ -132,4 +132,13 @@ class OrderCreateTest extends TestCase
         // TODO: implement
         self::markTestIncomplete('Not implemented');
     }
+
+    /**
+     * Test attribute "external_refs_json"
+     */
+    public function testPropertyExternalRefsJson()
+    {
+        // TODO: implement
+        self::markTestIncomplete('Not implemented');
+    }
 }

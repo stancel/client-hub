@@ -3,6 +3,8 @@
 .openapi-generator-ignore
 README.md
 package.json
+src/apis/AdminApi.ts
+src/apis/AffiliationsApi.ts
 src/apis/CommunicationsApi.ts
 src/apis/ContactsApi.ts
 src/apis/HealthApi.ts
@@ -14,7 +16,10 @@ src/apis/SettingsApi.ts
 src/apis/WebhooksApi.ts
 src/apis/index.ts
 src/index.ts
+src/models/AffiliationCreate.ts
+src/models/AffiliationUpdate.ts
 src/models/Amount.ts
+src/models/ApiKeyCreate.ts
 src/models/CommCreate.ts
 src/models/ContactCreate.ts
 src/models/ContactCreateEmail.ts
@@ -22,6 +27,7 @@ src/models/ContactCreatePhone.ts
 src/models/ContactUpdate.ts
 src/models/DiscountAmount.ts
 src/models/HTTPValidationError.ts
+src/models/InlineAffiliationCreate.ts
 src/models/InvoiceCreate.ts
 src/models/MarketingOptOuts.ts
 src/models/OrderCreate.ts
@@ -32,6 +38,8 @@ src/models/PaymentCreate.ts
 src/models/PreferenceSet.ts
 src/models/Quantity.ts
 src/models/SettingsUpdate.ts
+src/models/SourceCreate.ts
+src/models/SourceUpdate.ts
 src/models/StatusChange.ts
 src/models/Subtotal.ts
 src/models/TaxAmount.ts

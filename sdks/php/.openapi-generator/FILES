@@ -4,6 +4,8 @@
 .travis.yml
 README.md
 composer.json
+docs/Api/AdminApi.md
+docs/Api/AffiliationsApi.md
 docs/Api/CommunicationsApi.md
 docs/Api/ContactsApi.md
 docs/Api/HealthApi.md
@@ -13,7 +15,10 @@ docs/Api/OrdersApi.md
 docs/Api/OrganizationsApi.md
 docs/Api/SettingsApi.md
 docs/Api/WebhooksApi.md
+docs/Model/AffiliationCreate.md
+docs/Model/AffiliationUpdate.md
 docs/Model/Amount.md
+docs/Model/ApiKeyCreate.md
 docs/Model/CommCreate.md
 docs/Model/ContactCreate.md
 docs/Model/ContactCreateEmail.md
@@ -21,6 +26,7 @@ docs/Model/ContactCreatePhone.md
 docs/Model/ContactUpdate.md
 docs/Model/DiscountAmount.md
 docs/Model/HTTPValidationError.md
+docs/Model/InlineAffiliationCreate.md
 docs/Model/InvoiceCreate.md
 docs/Model/MarketingOptOuts.md
 docs/Model/OrderCreate.md
@@ -31,6 +37,8 @@ docs/Model/PaymentCreate.md
 docs/Model/PreferenceSet.md
 docs/Model/Quantity.md
 docs/Model/SettingsUpdate.md
+docs/Model/SourceCreate.md
+docs/Model/SourceUpdate.md
 docs/Model/StatusChange.md
 docs/Model/Subtotal.md
 docs/Model/TaxAmount.md
@@ -38,6 +46,8 @@ docs/Model/UnitPrice.md
 docs/Model/ValidationError.md
 docs/Model/ValidationErrorLocInner.md
 git_push.sh
+lib/Api/AdminApi.php
+lib/Api/AffiliationsApi.php
 lib/Api/CommunicationsApi.php
 lib/Api/ContactsApi.php
 lib/Api/HealthApi.php
@@ -50,7 +60,10 @@ lib/Api/WebhooksApi.php
 lib/ApiException.php
 lib/Configuration.php
 lib/HeaderSelector.php
+lib/Model/AffiliationCreate.php
+lib/Model/AffiliationUpdate.php
 lib/Model/Amount.php
+lib/Model/ApiKeyCreate.php
 lib/Model/CommCreate.php
 lib/Model/ContactCreate.php
 lib/Model/ContactCreateEmail.php
@@ -58,6 +71,7 @@ lib/Model/ContactCreatePhone.php
 lib/Model/ContactUpdate.php
 lib/Model/DiscountAmount.php
 lib/Model/HTTPValidationError.php
+lib/Model/InlineAffiliationCreate.php
 lib/Model/InvoiceCreate.php
 lib/Model/MarketingOptOuts.php
 lib/Model/ModelInterface.php
@@ -69,6 +83,8 @@ lib/Model/PaymentCreate.php
 lib/Model/PreferenceSet.php
 lib/Model/Quantity.php
 lib/Model/SettingsUpdate.php
+lib/Model/SourceCreate.php
+lib/Model/SourceUpdate.php
 lib/Model/StatusChange.php
 lib/Model/Subtotal.php
 lib/Model/TaxAmount.php
@@ -77,6 +93,8 @@ lib/Model/ValidationError.php
 lib/Model/ValidationErrorLocInner.php
 lib/ObjectSerializer.php
 phpunit.xml.dist
+test/Api/AdminApiTest.php
+test/Api/AffiliationsApiTest.php
 test/Api/CommunicationsApiTest.php
 test/Api/ContactsApiTest.php
 test/Api/HealthApiTest.php
@@ -86,7 +104,10 @@ test/Api/OrdersApiTest.php
 test/Api/OrganizationsApiTest.php
 test/Api/SettingsApiTest.php
 test/Api/WebhooksApiTest.php
+test/Model/AffiliationCreateTest.php
+test/Model/AffiliationUpdateTest.php
 test/Model/AmountTest.php
+test/Model/ApiKeyCreateTest.php
 test/Model/CommCreateTest.php
 test/Model/ContactCreateEmailTest.php
 test/Model/ContactCreatePhoneTest.php
@@ -94,6 +115,7 @@ test/Model/ContactCreateTest.php
 test/Model/ContactUpdateTest.php
 test/Model/DiscountAmountTest.php
 test/Model/HTTPValidationErrorTest.php
+test/Model/InlineAffiliationCreateTest.php
 test/Model/InvoiceCreateTest.php
 test/Model/MarketingOptOutsTest.php
 test/Model/OrderCreateTest.php
@@ -104,6 +126,8 @@ test/Model/PaymentCreateTest.php
 test/Model/PreferenceSetTest.php
 test/Model/QuantityTest.php
 test/Model/SettingsUpdateTest.php
+test/Model/SourceCreateTest.php
+test/Model/SourceUpdateTest.php
 test/Model/StatusChangeTest.php
 test/Model/SubtotalTest.php
 test/Model/TaxAmountTest.php

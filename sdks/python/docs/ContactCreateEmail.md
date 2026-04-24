@@ -8,6 +8,7 @@ Name | Type | Description | Notes
 **address** | **str** |  | 
 **type** | **str** |  | [optional] [default to 'personal']
 **is_primary** | **bool** |  | [optional] [default to False]
+**affiliation_uuid** | **str** |  | [optional] 
 
 ## Example
 

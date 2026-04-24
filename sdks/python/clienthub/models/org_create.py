@@ -29,7 +29,8 @@ class OrgCreate(BaseModel):
     name: StrictStr
     org_type: Optional[StrictStr] = None
     website: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["name", "org_type", "website"]
+    external_refs_json: Optional[Dict[str, Any]] = None
+    __properties: ClassVar[List[str]] = ["name", "org_type", "website", "external_refs_json"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -80,6 +81,11 @@ class OrgCreate(BaseModel):
         if self.website is None and "website" in self.model_fields_set:
             _dict['website'] = None
 
+        # set to None if external_refs_json (nullable) is None
+        # and model_fields_set contains the field
+        if self.external_refs_json is None and "external_refs_json" in self.model_fields_set:
+            _dict['external_refs_json'] = None
+
         return _dict
 
     @classmethod
@@ -94,7 +100,8 @@ class OrgCreate(BaseModel):
         _obj = cls.model_validate({
             "name": obj.get("name"),
             "org_type": obj.get("org_type"),
-            "website": obj.get("website")
+            "website": obj.get("website"),
+            "external_refs_json": obj.get("external_refs_json")
         })
         return _obj
 

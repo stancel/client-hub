@@ -30,10 +30,10 @@ class ContactUpdate(BaseModel):
     last_name: Optional[StrictStr] = None
     display_name: Optional[StrictStr] = None
     contact_type: Optional[StrictStr] = None
-    organization_uuid: Optional[StrictStr] = None
     enrichment_status: Optional[StrictStr] = None
     notes_text: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["first_name", "last_name", "display_name", "contact_type", "organization_uuid", "enrichment_status", "notes_text"]
+    external_refs_json: Optional[Dict[str, Any]] = None
+    __properties: ClassVar[List[str]] = ["first_name", "last_name", "display_name", "contact_type", "enrichment_status", "notes_text", "external_refs_json"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -94,11 +94,6 @@ class ContactUpdate(BaseModel):
         if self.contact_type is None and "contact_type" in self.model_fields_set:
             _dict['contact_type'] = None
 
-        # set to None if organization_uuid (nullable) is None
-        # and model_fields_set contains the field
-        if self.organization_uuid is None and "organization_uuid" in self.model_fields_set:
-            _dict['organization_uuid'] = None
-
         # set to None if enrichment_status (nullable) is None
         # and model_fields_set contains the field
         if self.enrichment_status is None and "enrichment_status" in self.model_fields_set:
@@ -108,6 +103,11 @@ class ContactUpdate(BaseModel):
         # and model_fields_set contains the field
         if self.notes_text is None and "notes_text" in self.model_fields_set:
             _dict['notes_text'] = None
+
+        # set to None if external_refs_json (nullable) is None
+        # and model_fields_set contains the field
+        if self.external_refs_json is None and "external_refs_json" in self.model_fields_set:
+            _dict['external_refs_json'] = None
 
         return _dict
 
@@ -125,9 +125,9 @@ class ContactUpdate(BaseModel):
             "last_name": obj.get("last_name"),
             "display_name": obj.get("display_name"),
             "contact_type": obj.get("contact_type"),
-            "organization_uuid": obj.get("organization_uuid"),
             "enrichment_status": obj.get("enrichment_status"),
-            "notes_text": obj.get("notes_text")
+            "notes_text": obj.get("notes_text"),
+            "external_refs_json": obj.get("external_refs_json")
         })
         return _obj
 

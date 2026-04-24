@@ -59,7 +59,8 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
     protected static $openAPITypes = [
         'number' => 'string',
         'type' => 'string',
-        'is_primary' => 'bool'
+        'is_primary' => 'bool',
+        'affiliation_uuid' => 'string'
     ];
 
     /**
@@ -72,7 +73,8 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
     protected static $openAPIFormats = [
         'number' => null,
         'type' => null,
-        'is_primary' => null
+        'is_primary' => null,
+        'affiliation_uuid' => null
     ];
 
     /**
@@ -83,7 +85,8 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
     protected static array $openAPINullables = [
         'number' => false,
         'type' => false,
-        'is_primary' => false
+        'is_primary' => false,
+        'affiliation_uuid' => true
     ];
 
     /**
@@ -174,7 +177,8 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
     protected static $attributeMap = [
         'number' => 'number',
         'type' => 'type',
-        'is_primary' => 'is_primary'
+        'is_primary' => 'is_primary',
+        'affiliation_uuid' => 'affiliation_uuid'
     ];
 
     /**
@@ -185,7 +189,8 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
     protected static $setters = [
         'number' => 'setNumber',
         'type' => 'setType',
-        'is_primary' => 'setIsPrimary'
+        'is_primary' => 'setIsPrimary',
+        'affiliation_uuid' => 'setAffiliationUuid'
     ];
 
     /**
@@ -196,7 +201,8 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
     protected static $getters = [
         'number' => 'getNumber',
         'type' => 'getType',
-        'is_primary' => 'getIsPrimary'
+        'is_primary' => 'getIsPrimary',
+        'affiliation_uuid' => 'getAffiliationUuid'
     ];
 
     /**
@@ -259,6 +265,7 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
         $this->setIfExists('number', $data ?? [], null);
         $this->setIfExists('type', $data ?? [], 'mobile');
         $this->setIfExists('is_primary', $data ?? [], false);
+        $this->setIfExists('affiliation_uuid', $data ?? [], null);
     }
 
     /**
@@ -383,6 +390,40 @@ class ContactCreatePhone implements ModelInterface, ArrayAccess, \JsonSerializab
             throw new \InvalidArgumentException('non-nullable is_primary cannot be null');
         }
         $this->container['is_primary'] = $is_primary;
+
+        return $this;
+    }
+
+    /**
+     * Gets affiliation_uuid
+     *
+     * @return string|null
+     */
+    public function getAffiliationUuid()
+    {
+        return $this->container['affiliation_uuid'];
+    }
+
+    /**
+     * Sets affiliation_uuid
+     *
+     * @param string|null $affiliation_uuid affiliation_uuid
+     *
+     * @return self
+     */
+    public function setAffiliationUuid($affiliation_uuid)
+    {
+        if (is_null($affiliation_uuid)) {
+            array_push($this->openAPINullablesSetToNull, 'affiliation_uuid');
+        } else {
+            $nullablesSetToNull = $this->getOpenAPINullablesSetToNull();
+            $index = array_search('affiliation_uuid', $nullablesSetToNull);
+            if ($index !== FALSE) {
+                unset($nullablesSetToNull[$index]);
+                $this->setOpenAPINullablesSetToNull($nullablesSetToNull);
+            }
+        }
+        $this->container['affiliation_uuid'] = $affiliation_uuid;
 
         return $this;
     }

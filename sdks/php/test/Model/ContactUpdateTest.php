@@ -116,15 +116,6 @@ class ContactUpdateTest extends TestCase
     }
 
     /**
-     * Test attribute "organization_uuid"
-     */
-    public function testPropertyOrganizationUuid()
-    {
-        // TODO: implement
-        self::markTestIncomplete('Not implemented');
-    }
-
-    /**
      * Test attribute "enrichment_status"
      */
     public function testPropertyEnrichmentStatus()
@@ -137,6 +128,15 @@ class ContactUpdateTest extends TestCase
      * Test attribute "notes_text"
      */
     public function testPropertyNotesText()
+    {
+        // TODO: implement
+        self::markTestIncomplete('Not implemented');
+    }
+
+    /**
+     * Test attribute "external_refs_json"
+     */
+    public function testPropertyExternalRefsJson()
     {
         // TODO: implement
         self::markTestIncomplete('Not implemented');
