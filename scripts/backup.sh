@@ -32,6 +32,12 @@ DB_PASSWORD="${DB_PASSWORD:-}"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_DIR/backups}"
 BACKUP_RETENTION="${BACKUP_RETENTION:-7}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.bundled.yml}"
+# Auto-include OpsInsights override when present so `compose exec mariadb`
+# targets the same container the operator is running day-to-day.
+COMPOSE_ARGS=(-f "$PROJECT_DIR/$COMPOSE_FILE")
+if [[ -f "$PROJECT_DIR/docker-compose.opsinsights.yml" ]]; then
+    COMPOSE_ARGS+=(-f "$PROJECT_DIR/docker-compose.opsinsights.yml")
+fi
 LOG_FILE="${LOG_FILE:-/var/log/client-hub/backup.log}"
 TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
 BACKUP_FILE="$BACKUP_DIR/clienthub-${TIMESTAMP}.sql.gz"
@@ -49,7 +55,7 @@ mkdir -p "$BACKUP_DIR"
 log "Starting backup of ${DB_NAME} to ${BACKUP_FILE}"
 
 # Dump and compress
-if docker compose -f "$PROJECT_DIR/$COMPOSE_FILE" exec -T mariadb \
+if docker compose "${COMPOSE_ARGS[@]}" exec -T mariadb \
     mariadb-dump -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
     2>/dev/null | gzip > "$BACKUP_FILE"; then
     chmod 0600 "$BACKUP_FILE"

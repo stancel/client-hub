@@ -13,3 +13,11 @@ __pycache__/
 .venv/
 api/.env
 api/.venv/
+
+# OpsInsights override — written per-VPS by scripts/setup-opsinsights-tls.sh.
+# Contains only port publish + TLS cert mount + ssl flags for the mariadb
+# service. Local-state, never committed.
+docker-compose.opsinsights.yml
+# Legacy pre-refactor backup; also local-only
+docker-compose.bundled.yml.bak-pre-opsinsights
+Caddyfile.bak-pre-opsinsights

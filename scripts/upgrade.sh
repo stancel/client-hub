@@ -27,7 +27,7 @@
 #   1. gunzip -c backups/<most-recent>.sql.gz | docker exec -i clienthub-mariadb \
 #          mariadb -u root -p"$MARIADB_ROOT_PASSWORD" clienthub
 #   2. git reset --hard <PRIOR_HEAD> (captured at step 0)
-#   3. docker compose -f "$COMPOSE_FILE" up -d --build
+#   3. docker compose "${COMPOSE_ARGS[@]}" up -d --build
 
 set -euo pipefail
 
@@ -53,6 +53,19 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$PROJECT_DIR"
+
+# ================================================================
+# Compose arg resolution — include the OpsInsights override if present.
+# setup-opsinsights-tls.sh writes docker-compose.opsinsights.yml as a
+# gitignored override that carries port publish + TLS cert mount + ssl
+# flags. It must be merged onto every compose invocation after OpsInsights
+# setup runs, otherwise `docker compose up` would recreate mariadb without
+# those customizations and silently break OpsInsights connectivity.
+# ================================================================
+COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+if [[ -f "$PROJECT_DIR/docker-compose.opsinsights.yml" ]]; then
+    COMPOSE_ARGS+=(-f "docker-compose.opsinsights.yml")
+fi
 
 # ================================================================
 # Colors (only if stdout is a TTY)
@@ -151,9 +164,9 @@ pause "Press ENTER to stop API + Caddy and run migrations…"
 # ================================================================
 phase "Phase 3 — Stop API + Caddy (MariaDB stays up)"
 
-docker compose -f "$COMPOSE_FILE" stop client-hub-api caddy 2>&1 | sed 's/^/    /' || true
+docker compose "${COMPOSE_ARGS[@]}" stop client-hub-api caddy 2>&1 | sed 's/^/    /' || true
 
-MDB_CONTAINER=$(docker compose -f "$COMPOSE_FILE" ps -q mariadb || true)
+MDB_CONTAINER=$(docker compose "${COMPOSE_ARGS[@]}" ps -q mariadb || true)
 [[ -n "$MDB_CONTAINER" ]] || fail "MariaDB container is not running — abort"
 
 docker exec "$MDB_CONTAINER" mariadb-admin ping \
@@ -193,11 +206,11 @@ pause "Press ENTER to rebuild the API image and bring everything back up…"
 # ================================================================
 phase "Phase 5 — Rebuild API image and start services"
 
-docker compose -f "$COMPOSE_FILE" build client-hub-api 2>&1 | tail -15 | sed 's/^/    /'
-docker compose -f "$COMPOSE_FILE" up -d 2>&1 | sed 's/^/    /'
+docker compose "${COMPOSE_ARGS[@]}" build client-hub-api 2>&1 | tail -15 | sed 's/^/    /'
+docker compose "${COMPOSE_ARGS[@]}" up -d 2>&1 | sed 's/^/    /'
 sleep 5
 
-docker compose -f "$COMPOSE_FILE" ps 2>&1 | sed 's/^/    /'
+docker compose "${COMPOSE_ARGS[@]}" ps 2>&1 | sed 's/^/    /'
 
 # ================================================================
 # Phase 6 — Smoke test
@@ -231,11 +244,13 @@ phase "Upgrade complete"
 good "Previous HEAD: ${PRIOR_HEAD:0:12}"
 good "Current HEAD:  ${NEW_HEAD:0:12}"
 echo ""
+# Serialize COMPOSE_ARGS for display in rollback instructions.
+COMPOSE_DISPLAY="${COMPOSE_ARGS[*]}"
 step "Monitor logs for a few minutes:"
-step "    docker compose -f $COMPOSE_FILE logs --tail=100 -f client-hub-api"
+step "    docker compose $COMPOSE_DISPLAY logs --tail=100 -f client-hub-api"
 echo ""
 step "If anything goes wrong, rollback:"
-step "    gunzip -c $LATEST_BACKUP | docker exec -i \$(docker compose -f $COMPOSE_FILE ps -q mariadb) \\"
+step "    gunzip -c $LATEST_BACKUP | docker exec -i \$(docker compose $COMPOSE_DISPLAY ps -q mariadb) \\"
 step "        mariadb -u root -p\$MARIADB_ROOT_PASSWORD ${DB_NAME:-clienthub}"
 step "    git reset --hard $PRIOR_HEAD"
-step "    docker compose -f $COMPOSE_FILE up -d --build"
+step "    docker compose $COMPOSE_DISPLAY up -d --build"

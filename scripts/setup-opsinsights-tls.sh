@@ -246,74 +246,69 @@ if ! $DRY_RUN; then
 fi
 
 # ============================================================
-# Step 3: Patch docker-compose.bundled.yml
+# Step 3: Write docker-compose.opsinsights.yml override
 # ============================================================
+# We used to patch docker-compose.bundled.yml in place, which is a
+# git-tracked file — so any `git pull` or `git reset --hard` silently
+# reverted the OpsInsights plumbing and broke the connection. Now we
+# write a separate override file that Docker Compose merges onto the
+# base. The override is gitignored, so upgrades never touch it.
 log
-log "=== Step 3: Patch docker-compose.bundled.yml ==="
+log "=== Step 3: docker-compose.opsinsights.yml override ==="
 
-COMPOSE_MARKER="# OpsInsights TLS exposure via setup-opsinsights-tls.sh"
+LEGACY_MARKER="# OpsInsights TLS exposure via setup-opsinsights-tls.sh"
+OVERRIDE_FILE="$INSTALL_DIR/docker-compose.opsinsights.yml"
 
-if grep -qF "$COMPOSE_MARKER" docker-compose.bundled.yml; then
-    log "Compose file already patched — skipping."
-else
-    log "Backing up docker-compose.bundled.yml..."
-    run "cp -n docker-compose.bundled.yml docker-compose.bundled.yml.bak-pre-opsinsights"
+# Migration: if the base compose still carries the old in-place patches
+# (installs set up before this refactor), revert them first. The patches
+# are exactly the same fields the override file will provide, so without
+# reverting we'd get duplicate port bindings etc.
+if grep -qF "$LEGACY_MARKER" "$INSTALL_DIR/docker-compose.bundled.yml"; then
+    log "Legacy in-place patches detected on docker-compose.bundled.yml — reverting."
+    if [[ -f "$INSTALL_DIR/docker-compose.bundled.yml.bak-pre-opsinsights" ]]; then
+        run "cp $INSTALL_DIR/docker-compose.bundled.yml.bak-pre-opsinsights $INSTALL_DIR/docker-compose.bundled.yml"
+        log "  Restored from .bak-pre-opsinsights."
+    elif (cd "$INSTALL_DIR" && git ls-files --error-unmatch docker-compose.bundled.yml >/dev/null 2>&1); then
+        run "git -C $INSTALL_DIR checkout -- docker-compose.bundled.yml"
+        log "  Restored from git (the .bak file was lost to a prior git reset)."
+    else
+        warn "Could not auto-revert legacy patches — neither .bak nor git-tracked copy available. You may need to revert docker-compose.bundled.yml manually."
+    fi
+fi
 
-    log "Applying patch via Python..."
-    if ! $DRY_RUN; then
-        python3 - <<'PYEOF'
-import re
-path = "docker-compose.bundled.yml"
-marker = "# OpsInsights TLS exposure via setup-opsinsights-tls.sh"
-with open(path) as f:
-    content = f.read()
+if [[ -f "$OVERRIDE_FILE" ]] && ! $DRY_RUN; then
+    log "Override file already exists — refreshing to current canonical form."
+fi
 
-injection = f"""    {marker}
+run "cat > $OVERRIDE_FILE <<'OVRYAML'
+# docker-compose.opsinsights.yml
+#
+# Override written by scripts/setup-opsinsights-tls.sh. Merged onto
+# docker-compose.bundled.yml via docker compose -f bundled.yml -f opsinsights.yml.
+# Adds MariaDB port publish, TLS cert mount, and --ssl-cert/--ssl-key flags.
+#
+# Gitignored — never committed. Delete + re-run setup-opsinsights-tls.sh to
+# regenerate.
+
+services:
+  mariadb:
     ports:
-      - "3306:3306"
-"""
-volume_injection = """      # OpsInsights TLS: Let's Encrypt cert copied from Caddy
+      - \"3306:3306\"
+    volumes:
       - ./data/mariadb-tls:/etc/mysql-tls:ro
-"""
-command_injection = """    command:
+    command:
       - --ssl-cert=/etc/mysql-tls/server.crt
       - --ssl-key=/etc/mysql-tls/server.key
-"""
+OVRYAML"
 
-# Find the mariadb service block and inject before 'healthcheck:'
-# Regex: find 'mariadb:' service, then inject ports + volume addition + command
-# Insert ports after 'TZ: UTC' line in environment
-content = re.sub(
-    r"(  mariadb:\n(?:(?!^  [a-z])[\s\S])*?      TZ: UTC\n)",
-    r"\1" + injection,
-    content,
-    count=1,
-    flags=re.MULTILINE,
-)
+run "chmod 0644 $OVERRIDE_FILE"
 
-# Append to the volumes: list for mariadb (after the existing ./data/mariadb line)
-content = re.sub(
-    r"(  mariadb:\n(?:(?!^  [a-z])[\s\S])*?    volumes:\n      - \./data/mariadb:/var/lib/mysql\n)",
-    r"\1" + volume_injection,
-    content,
-    count=1,
-    flags=re.MULTILINE,
-)
-
-# Insert command: block after the mariadb volumes: block
-content = re.sub(
-    r"(  mariadb:\n(?:(?!^  [a-z])[\s\S])*?      - \./data/mariadb-tls:/etc/mysql-tls:ro\n)",
-    r"\1" + command_injection,
-    content,
-    count=1,
-    flags=re.MULTILINE,
-)
-
-with open(path, "w") as f:
-    f.write(content)
-print("Patch applied.")
-PYEOF
+# Sanity — docker compose should be able to parse both files together.
+if ! $DRY_RUN; then
+    if ! (cd "$INSTALL_DIR" && docker compose -f docker-compose.bundled.yml -f docker-compose.opsinsights.yml config >/dev/null 2>&1); then
+        fail "Merged compose config is invalid. Inspect with: docker compose -f docker-compose.bundled.yml -f docker-compose.opsinsights.yml config"
     fi
+    log "Merged compose config parses cleanly."
 fi
 
 # ============================================================
@@ -372,7 +367,11 @@ run "netfilter-persistent save"
 log
 log "=== Step 5: Apply compose changes ==="
 
-run "docker compose -f docker-compose.bundled.yml up -d mariadb"
+# Force recreate so the override's ports + volumes + command take effect.
+# Without --force-recreate, docker compose may see a running mariadb with
+# the same env and skip the recreation even though the override file
+# changed (ports/volumes/command are container-config, not env).
+run "docker compose -f docker-compose.bundled.yml -f docker-compose.opsinsights.yml up -d --force-recreate mariadb"
 
 log "Waiting 15s for MariaDB to become healthy..."
 $DRY_RUN || sleep 15

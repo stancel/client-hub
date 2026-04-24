@@ -21,12 +21,23 @@ fi
 echo "=== Client Hub Uninstaller ==="
 echo ""
 
-# Stop containers
+# Stop containers. Include the OpsInsights override if present so we
+# tear down the exact same project that was running (container names,
+# networks, and volumes all key off the merged compose).
+stop_compose() {
+    local base="$1"
+    local args=(-f "$base")
+    if [[ -f "$INSTALL_DIR/docker-compose.opsinsights.yml" ]]; then
+        args+=(-f "$INSTALL_DIR/docker-compose.opsinsights.yml")
+    fi
+    docker compose "${args[@]}" down --remove-orphans 2>/dev/null || true
+}
+
 if [[ -f "$INSTALL_DIR/docker-compose.bundled.yml" ]]; then
     echo "Stopping containers..."
-    docker compose -f "$INSTALL_DIR/docker-compose.bundled.yml" down --remove-orphans 2>/dev/null || true
+    stop_compose "$INSTALL_DIR/docker-compose.bundled.yml"
 elif [[ -f "$INSTALL_DIR/docker-compose.bundled-nodomain.yml" ]]; then
-    docker compose -f "$INSTALL_DIR/docker-compose.bundled-nodomain.yml" down --remove-orphans 2>/dev/null || true
+    stop_compose "$INSTALL_DIR/docker-compose.bundled-nodomain.yml"
 fi
 
 # Remove cron job
