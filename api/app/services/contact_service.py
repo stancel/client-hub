@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.affiliation import ContactOrgAffiliation
 from app.models.communication import Communication
 from app.models.contact import (
     Contact,
@@ -20,6 +21,10 @@ from app.models.contact import (
 from app.models.invoice import Invoice
 from app.models.lookups import ContactType, EmailType, MarketingSource, PhoneType
 from app.models.order import Order
+from app.services.affiliation_service import (
+    create_affiliation,
+    get_primary_affiliation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +116,8 @@ async def get_contact_by_uuid(db: AsyncSession, contact_uuid: str) -> Contact | 
         .options(
             selectinload(Contact.contact_type),
             selectinload(Contact.first_seen_source),
-            selectinload(Contact.organization),
+            selectinload(Contact.affiliations).selectinload(ContactOrgAffiliation.organization),
+            selectinload(Contact.affiliations).selectinload(ContactOrgAffiliation.seniority_level),
             selectinload(Contact.phones).selectinload(ContactPhone.phone_type),
             selectinload(Contact.emails).selectinload(ContactEmail.email_type),
             selectinload(Contact.addresses),
@@ -188,6 +194,14 @@ async def create_contact(db: AsyncSession, data: dict, source_id: int | None = N
     db.add(contact)
     await db.commit()
     await db.refresh(contact)
+
+    # Affiliations — created after the contact exists so each affiliation
+    # can reference contact.id. create_affiliation commits its own row.
+    for aff_data in data.get("affiliations", []) or []:
+        await create_affiliation(
+            db, contact, aff_data, created_by=data.get("data_source", "api")
+        )
+
     return contact
 
 
@@ -217,6 +231,13 @@ async def get_contact_summary(db: AsyncSession, contact: Contact) -> dict:
         if e.is_primary:
             primary_email = e.email_address
             break
+
+    # Primary affiliation (org, role, department)
+    primary_aff = await get_primary_affiliation(db, contact.id)
+    primary_org_uuid = primary_aff.organization.uuid if primary_aff else None
+    primary_org_name = primary_aff.organization.name if primary_aff else None
+    primary_role_title = primary_aff.role_title if primary_aff else None
+    primary_department = primary_aff.department if primary_aff else None
 
     # Order stats
     order_stmt = select(
@@ -251,7 +272,10 @@ async def get_contact_summary(db: AsyncSession, contact: Contact) -> dict:
         "marketing_opt_out_sms": contact.marketing_opt_out_sms,
         "marketing_opt_out_email": contact.marketing_opt_out_email,
         "marketing_opt_out_phone": contact.marketing_opt_out_phone,
-        "organization": contact.organization.name if contact.organization else None,
+        "primary_organization_uuid": primary_org_uuid,
+        "primary_organization_name": primary_org_name,
+        "primary_role_title": primary_role_title,
+        "primary_department": primary_department,
         "primary_phone": primary_phone,
         "primary_email": primary_email,
         "total_orders": order_result[0],

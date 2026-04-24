@@ -13,7 +13,6 @@ class Contact(Base):
     uuid: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
     contact_type_id: Mapped[int] = mapped_column(ForeignKey("contact_types.id"))
     first_seen_source_id: Mapped[int] = mapped_column(ForeignKey("sources.id", ondelete="RESTRICT"))
-    organization_id: Mapped[int | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"))
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(200))
@@ -37,7 +36,9 @@ class Contact(Base):
     contact_type: Mapped["ContactType"] = relationship(foreign_keys=[contact_type_id])
     converted_from_type: Mapped["ContactType | None"] = relationship(foreign_keys=[converted_from_type_id])
     first_seen_source: Mapped["Source"] = relationship(foreign_keys=[first_seen_source_id])
-    organization: Mapped["Organization | None"] = relationship(back_populates="contacts")
+    affiliations: Mapped[list["ContactOrgAffiliation"]] = relationship(
+        back_populates="contact", cascade="all, delete-orphan"
+    )
     phones: Mapped[list["ContactPhone"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
     emails: Mapped[list["ContactEmail"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
     addresses: Mapped[list["ContactAddress"]] = relationship(back_populates="contact", cascade="all, delete-orphan")
@@ -57,6 +58,9 @@ class ContactPhone(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id", ondelete="CASCADE"))
+    affiliation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contact_org_affiliations.id", ondelete="SET NULL")
+    )
     phone_type_id: Mapped[int] = mapped_column(ForeignKey("phone_types.id"))
     phone_number: Mapped[str] = mapped_column(String(20), nullable=False)
     phone_extension: Mapped[str | None] = mapped_column(String(10))
@@ -77,6 +81,9 @@ class ContactEmail(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id", ondelete="CASCADE"))
+    affiliation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contact_org_affiliations.id", ondelete="SET NULL")
+    )
     email_type_id: Mapped[int] = mapped_column(ForeignKey("email_types.id"))
     email_address: Mapped[str] = mapped_column(String(255), nullable=False)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -96,6 +103,9 @@ class ContactAddress(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id", ondelete="CASCADE"))
+    affiliation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contact_org_affiliations.id", ondelete="SET NULL")
+    )
     address_type_id: Mapped[int] = mapped_column(ForeignKey("address_types.id"))
     address_line1: Mapped[str] = mapped_column(String(255), nullable=False)
     address_line2: Mapped[str | None] = mapped_column(String(255))
@@ -185,6 +195,7 @@ class ContactPreference(Base):
     contact: Mapped["Contact"] = relationship(back_populates="preferences")
 
 
+from app.models.affiliation import ContactOrgAffiliation  # noqa: E402,F401
 from app.models.lookups import (  # noqa: E402
     AddressType,
     ChannelType,
@@ -194,5 +205,5 @@ from app.models.lookups import (  # noqa: E402
     PhoneType,
     Tag,
 )
-from app.models.organization import Organization  # noqa: E402
-from app.models.source import Source  # noqa: E402
+from app.models.organization import Organization  # noqa: E402,F401
+from app.models.source import Source  # noqa: E402,F401

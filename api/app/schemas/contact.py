@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.schemas.affiliation import InlineAffiliationCreate
+
 
 class PhoneOut(BaseModel):
     number: str
@@ -111,20 +113,22 @@ class ContactCreatePhone(BaseModel):
     number: str
     type: str = "mobile"
     is_primary: bool = False
+    affiliation_uuid: str | None = None
 
 
 class ContactCreateEmail(BaseModel):
     address: str
     type: str = "personal"
     is_primary: bool = False
+    affiliation_uuid: str | None = None
 
 
 class ContactCreate(BaseModel):
     first_name: str
     last_name: str
     contact_type: str = "prospect"
-    organization_uuid: str | None = None
     display_name: str | None = None
+    affiliations: list[InlineAffiliationCreate] = []
     phones: list[ContactCreatePhone] = []
     emails: list[ContactCreateEmail] = []
     marketing_sources: list[str] = []
@@ -137,7 +141,6 @@ class ContactUpdate(BaseModel):
     last_name: str | None = None
     display_name: str | None = None
     contact_type: str | None = None
-    organization_uuid: str | None = None
     enrichment_status: str | None = None
     notes_text: str | None = None
     external_refs_json: dict[str, Any] | None = None
@@ -172,7 +175,10 @@ class ContactSummaryOut(BaseModel):
     marketing_opt_out_sms: bool
     marketing_opt_out_email: bool
     marketing_opt_out_phone: bool
-    organization: str | None
+    primary_organization_uuid: str | None
+    primary_organization_name: str | None
+    primary_role_title: str | None
+    primary_department: str | None
     primary_phone: str | None
     primary_email: str | None
     total_orders: int

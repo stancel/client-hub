@@ -25,7 +25,9 @@ class Organization(Base):
     phones: Mapped[list["OrgPhone"]] = relationship(back_populates="organization", cascade="all, delete-orphan")
     emails: Mapped[list["OrgEmail"]] = relationship(back_populates="organization", cascade="all, delete-orphan")
     addresses: Mapped[list["OrgAddress"]] = relationship(back_populates="organization", cascade="all, delete-orphan")
-    contacts: Mapped[list] = relationship("Contact", back_populates="organization")
+    affiliations: Mapped[list] = relationship(
+        "ContactOrgAffiliation", back_populates="organization", cascade="all, delete-orphan"
+    )
 
 
 class OrgPhone(Base):

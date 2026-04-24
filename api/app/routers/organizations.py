@@ -67,7 +67,6 @@ async def _get_org(db: AsyncSession, uuid: str) -> Organization | None:
             selectinload(Organization.phones).selectinload(OrgPhone.phone_type),
             selectinload(Organization.emails).selectinload(OrgEmail.email_type),
             selectinload(Organization.addresses).selectinload(OrgAddress.address_type),
-            selectinload(Organization.contacts),
         )
     )
     return (await db.execute(stmt)).scalar_one_or_none()
@@ -79,9 +78,13 @@ async def get_organization(uuid: str, db: AsyncSession = Depends(get_db)):
     if not org:
         raise HTTPException(status_code=404, detail=f"Organization {uuid} not found")
 
-    from app.models.contact import Contact
+    from app.models.affiliation import ContactOrgAffiliation
     contact_count = (await db.execute(
-        select(func.count()).where(Contact.organization_id == org.id)
+        select(func.count(func.distinct(ContactOrgAffiliation.contact_id)))
+        .where(
+            ContactOrgAffiliation.organization_id == org.id,
+            ContactOrgAffiliation.is_active == True,  # noqa: E712
+        )
     )).scalar() or 0
 
     return {

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.routers import (
     admin,
+    affiliations,
     communications,
     contacts,
     health,
@@ -28,6 +29,7 @@ app.include_router(health.router, prefix="/api/v1")
 # Authenticated routes
 app.include_router(lookup.router, prefix="/api/v1")
 app.include_router(contacts.router, prefix="/api/v1")
+app.include_router(affiliations.router, prefix="/api/v1")
 app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(orders.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")

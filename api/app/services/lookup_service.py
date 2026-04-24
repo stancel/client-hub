@@ -55,6 +55,7 @@ async def _build_match_results(
     phone_map: dict | None = None,
     email_map: dict | None = None,
 ):
+    from app.models.affiliation import ContactOrgAffiliation as COAModel
     from app.models.contact import ContactEmail as CEModel
     from app.models.contact import ContactPhone as CPModel
 
@@ -63,7 +64,7 @@ async def _build_match_results(
         .where(Contact.id.in_(contact_ids))
         .options(
             selectinload(Contact.contact_type),
-            selectinload(Contact.organization),
+            selectinload(Contact.affiliations).selectinload(COAModel.organization),
             selectinload(Contact.tags).selectinload(ContactTagMap.tag),
             selectinload(Contact.channel_prefs).selectinload(ContactChannelPref.channel_type),
             selectinload(Contact.phones).selectinload(CPModel.phone_type),
@@ -147,13 +148,16 @@ async def _build_match_results(
             e = email_map[c.id]
             email_info = {"address": e.email_address, "type": "email", "is_primary": e.is_primary, "is_verified": e.is_verified}
 
+        primary_aff = next(
+            (a for a in c.affiliations if a.is_primary and a.is_active), None
+        )
         matches.append({
             "uuid": c.uuid,
             "first_name": c.first_name,
             "last_name": c.last_name,
             "display_name": c.display_name,
             "contact_type": c.contact_type.code,
-            "organization": c.organization.name if c.organization else None,
+            "organization": primary_aff.organization.name if primary_aff else None,
             "phone": phone_info,
             "email": email_info,
             "phones": all_phones,

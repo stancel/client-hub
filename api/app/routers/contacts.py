@@ -48,23 +48,45 @@ async def get_contact_endpoint(uuid: str, db: AsyncSession = Depends(get_db)):
     if not contact:
         raise HTTPException(status_code=404, detail=f"Contact {uuid} not found")
 
+    from app.services.affiliation_service import serialize_affiliation
+
+    active_affiliations = [a for a in contact.affiliations if a.is_active]
+    primary_aff = next((a for a in active_affiliations if a.is_primary), None)
+    affiliation_uuid_by_id = {a.id: a.uuid for a in contact.affiliations}
+
     return {
         "uuid": contact.uuid,
         "first_name": contact.first_name,
         "last_name": contact.last_name,
         "display_name": contact.display_name,
         "contact_type": contact.contact_type.code,
-        "organization": contact.organization.name if contact.organization else None,
+        "primary_organization_uuid": primary_aff.organization.uuid if primary_aff else None,
+        "primary_organization_name": primary_aff.organization.name if primary_aff else None,
+        "primary_role_title": primary_aff.role_title if primary_aff else None,
+        "primary_department": primary_aff.department if primary_aff else None,
+        "affiliations": [serialize_affiliation(a) for a in active_affiliations],
         "enrichment_status": contact.enrichment_status,
         "marketing_opt_out_sms": contact.marketing_opt_out_sms,
         "marketing_opt_out_email": contact.marketing_opt_out_email,
         "marketing_opt_out_phone": contact.marketing_opt_out_phone,
         "phones": [
-            {"number": p.phone_number, "type": p.phone_type.code, "is_primary": p.is_primary, "is_verified": p.is_verified}
+            {
+                "number": p.phone_number,
+                "type": p.phone_type.code,
+                "is_primary": p.is_primary,
+                "is_verified": p.is_verified,
+                "affiliation_uuid": affiliation_uuid_by_id.get(p.affiliation_id) if p.affiliation_id else None,
+            }
             for p in contact.phones
         ],
         "emails": [
-            {"address": e.email_address, "type": e.email_type.code, "is_primary": e.is_primary, "is_verified": e.is_verified}
+            {
+                "address": e.email_address,
+                "type": e.email_type.code,
+                "is_primary": e.is_primary,
+                "is_verified": e.is_verified,
+                "affiliation_uuid": affiliation_uuid_by_id.get(e.affiliation_id) if e.affiliation_id else None,
+            }
             for e in contact.emails
         ],
         "tags": [tm.tag.label for tm in contact.tags],
