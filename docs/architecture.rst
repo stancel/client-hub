@@ -90,7 +90,7 @@ Docker DNS (``mariadb:3306``).
    ┌─────────────────────────────────────────┐
    │    Shared MariaDB 12.2.2               │
    │    ~/docker/mariadb/ (port 3306)       │
-   │    Database: dev_schema                │
+   │    Database: clienthub                │
    │    31 tables + 2 views (3NF)           │
    └─────────────────────────────────────────┘
           ▲                    ▲
@@ -111,7 +111,7 @@ Database Configuration
    * - Setting
      - Value
    * - Database name
-     - ``dev_schema`` (development)
+     - ``clienthub``
    * - Docker DNS host
      - ``mariadb``
    * - Port
@@ -143,7 +143,7 @@ in ``.env.example`` (committed).
      - Description
    * - ``DB_NAME``
      - No
-     - Database name (default: ``dev_schema``)
+     - Database name (default: ``clienthub``)
    * - ``DB_USER``
      - No
      - Database user (default: ``root``)

@@ -10,7 +10,7 @@ services:
     environment:
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: ${DB_NAME:-dev_schema}
+      DB_NAME: ${DB_NAME:-clienthub}
       DB_USER: ${DB_USER:-root}
       DB_PASSWORD: ${DB_PASSWORD}
       API_KEY: ${API_KEY:-dev-api-key}

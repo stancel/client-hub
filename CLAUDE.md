@@ -10,7 +10,7 @@
 - **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
-- **Schema:** 34 tables + 3 views in `dev_schema` (3NF)
+- **Schema:** 34 tables + 3 views in `clienthub` (3NF)
 - **API:** 28 endpoint paths, 89 tests passing
 - **SDKs:** Python, PHP, TypeScript (auto-generated)
 - **CI/CD:** GitHub Actions (lint → test → build → SDK gen)
@@ -41,7 +41,7 @@ Client Hub does **not** run its own database container. It uses the shared Maria
 | MariaDB version | 12.2.2 |
 | Docker DNS | `mariadb:3306` (via `my-main-net`) |
 | Host access | `10.0.1.220:3306` |
-| Database name | `dev_schema` (development) |
+| Database name | `clienthub` |
 | MCP tools | `apisix-mysql` (`execute_sql`, `search_objects`) via `~/docker/mysql-mcp-server/` |
 
 ### Schema Design Workflow
@@ -126,7 +126,7 @@ docker compose restart client-hub-api
 docker compose down && docker compose build && docker compose up -d
 
 # Connect to database
-mariadb -h 10.0.1.220 -P 3306 -u root -p dev_schema
+mariadb -h 10.0.1.220 -P 3306 -u root -p clienthub
 
 # Run tests
 cd api && .venv/bin/python -m pytest tests/ -v
@@ -138,10 +138,10 @@ cd api && .venv/bin/ruff check app/ tests/
 ./scripts/generate-sdks.sh
 
 # Backup database
-docker exec mariadb mariadb-dump -u root -p dev_schema > backups/dev_$(date +%Y%m%d_%H%M%S).sql
+docker exec mariadb mariadb-dump -u root -p clienthub > backups/dev_$(date +%Y%m%d_%H%M%S).sql
 
 # Restore from backup
-docker exec -i mariadb mariadb -u root -p dev_schema < backups/FILENAME.sql
+docker exec -i mariadb mariadb -u root -p clienthub < backups/FILENAME.sql
 
 # Provision a new production VPS (one-line installer)
 curl -fsSL https://raw.githubusercontent.com/stancel/client-hub/master/scripts/install.sh | sudo bash
@@ -161,7 +161,7 @@ docker compose logs --tail=50 client-hub-api
 cd ~/docker/mariadb && docker compose ps
 
 # Test database connectivity
-mariadb -h 10.0.1.220 -P 3306 -u root -p -e "USE dev_schema; SELECT COUNT(*) FROM contacts;"
+mariadb -h 10.0.1.220 -P 3306 -u root -p -e "USE clienthub; SELECT COUNT(*) FROM contacts;"
 
 # Test API health
 curl -s http://10.0.1.220:8800/api/v1/health | python3 -m json.tool

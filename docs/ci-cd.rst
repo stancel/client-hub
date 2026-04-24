@@ -58,7 +58,7 @@ Environment variables for CI tests:
 
 - ``DB_HOST=127.0.0.1``
 - ``DB_PORT=3306``
-- ``DB_NAME=test_schema``
+- ``DB_NAME=clienthub_test``
 - ``DB_USER=root``
 - ``DB_PASSWORD=test_root_password``
 - ``API_KEY=test-api-key``

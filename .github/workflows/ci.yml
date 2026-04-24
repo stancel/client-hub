@@ -39,7 +39,7 @@ jobs:
         image: mariadb:12
         env:
           MARIADB_ROOT_PASSWORD: test_root_password
-          MARIADB_DATABASE: test_schema
+          MARIADB_DATABASE: clienthub_test
         ports:
           - 3306:3306
         options: >-
@@ -72,21 +72,21 @@ jobs:
         run: |
           for f in migrations/*.sql; do
             echo "Applying: $f"
-            mariadb -h 127.0.0.1 -u root -ptest_root_password test_schema < "$f"
+            mariadb -h 127.0.0.1 -u root -ptest_root_password clienthub_test < "$f"
           done
 
       - name: Run dev seed data (test data for CI)
         run: |
           for f in migrations/dev/*.sql; do
             echo "Applying: $f"
-            mariadb -h 127.0.0.1 -u root -ptest_root_password test_schema < "$f"
+            mariadb -h 127.0.0.1 -u root -ptest_root_password clienthub_test < "$f"
           done
 
       - name: Run tests
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
-          DB_NAME: test_schema
+          DB_NAME: clienthub_test
           DB_USER: root
           DB_PASSWORD: test_root_password
           API_KEY: test-api-key
@@ -119,7 +119,7 @@ jobs:
           docker compose up -d
           sleep 5
         env:
-          DB_NAME: dev_schema
+          DB_NAME: clienthub
           DB_USER: root
           DB_PASSWORD: unused
           API_KEY: ci-key

@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     db_host: str = "mariadb"
     db_port: int = 3306
-    db_name: str = "dev_schema"
+    db_name: str = "clienthub"
     db_user: str = "clienthub"
     db_password: str = ""
     api_key: str = "dev-api-key"  # Legacy: kept for backward compat in dev

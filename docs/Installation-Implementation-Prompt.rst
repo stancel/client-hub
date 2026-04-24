@@ -176,10 +176,8 @@ Env var contract (see ``api/app/config.py``):
 
    db_host: str = "mariadb"
    db_port: int = 3306
-   db_name: str = "dev_schema"
-   db_user: str = "clienthub"   # NOTE: compose passes DB_USER=root
-                                # today — we will standardize on
-                                # "clienthub" everywhere
+   db_name: str = "clienthub"
+   db_user: str = "clienthub"
    db_password: str = ""
    api_key: str = "dev-api-key"
    api_host: str = "0.0.0.0"
@@ -195,7 +193,7 @@ loop. The canonical pattern is from ``.github/workflows/ci.yml``:
 .. code-block:: bash
 
    for f in migrations/0*.sql; do
-     mariadb -h 127.0.0.1 -u root -ptest_root_password test_schema < "$f"
+     mariadb -h 127.0.0.1 -u root -ptest_root_password clienthub_test < "$f"
    done
 
 Current migration files (1–13):
@@ -1598,9 +1596,8 @@ parent Claude Code session in the dental care repo) will:
 
    **Second pass:** See ``docs/Post-Deployment-Fixes-Prompt.rst`` for
    fixes and improvements discovered during the first real production
-   deployment.
-    using the same pattern (each company gets its own client-hub
-    instance on its own droplet)
+   deployment. Future onboarded companies follow the same pattern
+   (each company gets its own client-hub instance on its own droplet).
 
 
 **********************************************************************

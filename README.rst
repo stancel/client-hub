@@ -112,7 +112,7 @@ Quick Info
    * - **DB Host**
      - ``mariadb:3306`` (Docker DNS) / ``10.0.1.220:3306`` (host)
    * - **DB Name**
-     - ``dev_schema`` (development)
+     - ``clienthub``
    * - **Schema**
      - 34 tables + 3 views (3NF normalized)
    * - **API Endpoints**
@@ -161,7 +161,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    ┌─────────────────────────────────────────┐
    │     Shared MariaDB 12.2.2              │
    │     ~/docker/mariadb/ (port 3306)      │
-   │     Database: dev_schema               │
+   │     Database: clienthub               │
    │     34 tables + 3 views (3NF)          │
    └─────────────────────────────────────────┘
 
@@ -286,7 +286,7 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
 Database Schema
 **********************************************************************
 
-34 tables + 3 views in ``dev_schema``, normalized to 3NF.
+34 tables + 3 views in ``clienthub``, normalized to 3NF.
 
 **Entity tables (19):** api_keys, business_settings, contacts,
 organizations, contact_phones, contact_emails, contact_addresses,
@@ -392,7 +392,7 @@ Key Commands
    docker compose down && docker compose build && docker compose up -d
 
    # Connect to database
-   mariadb -h 10.0.1.220 -P 3306 -u root -p dev_schema
+   mariadb -h 10.0.1.220 -P 3306 -u root -p clienthub
 
    # Run tests
    cd api && .venv/bin/python -m pytest tests/ -v
@@ -404,7 +404,7 @@ Key Commands
    ./scripts/generate-sdks.sh
 
    # Backup database
-   docker exec mariadb mariadb-dump -u root -p dev_schema > backups/dev_$(date +%Y%m%d_%H%M%S).sql
+   docker exec mariadb mariadb-dump -u root -p clienthub > backups/dev_$(date +%Y%m%d_%H%M%S).sql
 
 .. _client-hub-project-structure:
 
