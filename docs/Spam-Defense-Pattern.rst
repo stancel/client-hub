@@ -413,22 +413,154 @@ build/deploy time. One source of truth — no per-site list
 maintenance — and operators update patterns from one place
 (Client Hub admin) for instant fan-out on next deploy.
 
-Suggested consumer-side flow (Next.js / Vercel):
+This is the scaffolding both Complete Dental Care
+(``~/Sites/complete-dental-care-nextjs/``) and Clever Orchid
+(``~/Sites/clever-orchid-nextjs/``) shipped on 2026-04-29 as the
+canonical reference implementation. Future Web Factory sites
+should follow the same shape.
 
-.. code-block:: bash
+.. _client-hub-sdp-consumer-files:
 
-   # In the site's build script:
-   curl -fsSL \
-     -H "X-API-Key: $CLIENTHUB_SOURCE_KEY" \
-     https://client-hub.<customer>.com/api/v1/spam-patterns \
-     > public/spam-patterns.json
-   # Then the build embeds spam-patterns.json into the bundled
-   # filter module that runs server-side on form submit.
+Files
+======================================================================
 
-If the fetch fails at build time, the build fails — the consumer
-site never deploys with stale or empty patterns. The previous
-build's embedded patterns continue to serve until a fresh deploy
-succeeds.
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - File
+     - State
+     - Purpose
+   * - ``scripts/fetch-spam-patterns.mjs``
+     - new
+     - prebuild fetch (fail-closed by default); ``--allow-fallback``
+       flag for the rare CI/dev rescue case; auto-loads
+       ``.env.local``. Validates the 5-key shape before writing.
+   * - ``lib/spam-patterns-fallback.json``
+     - new (committed)
+     - Sorted snapshot of the canonical list at cutover. Used only
+       when ``--allow-fallback`` is passed (intentional escape
+       hatch); never used in a production build. Regenerated
+       whenever the operator wants a fresh fallback baseline.
+   * - ``lib/generated/spam-patterns.json``
+     - new (gitignored)
+     - Rewritten on every prebuild from the live Client Hub
+       response. Imported by the server-side filter module.
+   * - ``lib/spam-filter.ts`` (or ``lib/spam-defense.ts``)
+     - refactored
+     - Hardcoded array constants removed; replaced with imports
+       from ``lib/generated/spam-patterns.json``. New
+       ``isBlockedPhoneCountry`` helper runs BEFORE the digit-
+       count check (otherwise ``+235 6 89 50 54`` strips to 10
+       digits and would falsely pass). Email blocklist now also
+       checks ``full_email_block`` for exact matches.
+   * - ``app/api/contact/route.ts`` and any other ingestion route
+     - small wiring change
+     - Country-code check called before email-block check.
+       Otherwise unchanged.
+   * - ``package.json``
+     - 2-3 hooks
+     - ``"prebuild"`` runs the fail-closed fetch; ``"postinstall"``
+       (optional) runs an idempotent ``--seed`` so a fresh clone
+       has a usable pattern file before the first build.
+       ``"predev"`` is the per-site policy decision (see below).
+   * - ``.gitignore``
+     - +1 line
+     - ``lib/generated/`` so the build artifact never gets
+       committed.
+
+.. _client-hub-sdp-fetcher:
+
+The fetcher script
+======================================================================
+
+``scripts/fetch-spam-patterns.mjs`` does five things:
+
+1. Read ``CLIENTHUB_URL`` and ``CLIENTHUB_API_KEY`` (or
+   ``CLIENTHUB_SOURCE_KEY``) from the process environment.
+   Auto-load ``.env.local`` for local dev.
+2. Issue ``GET <CLIENTHUB_URL>/api/v1/spam-patterns`` with the
+   ``X-API-Key`` header.
+3. Validate the response: must be a JSON object with exactly five
+   keys (``email_substring``, ``full_email_block``, ``url_regex``,
+   ``phrase_regex``, ``phone_country_block``), each an array of
+   strings.
+4. Sort each array (so generated builds are byte-for-byte
+   reproducible) and write to ``lib/generated/spam-patterns.json``
+   with stable indentation.
+5. Exit ``1`` on any failure unless ``--allow-fallback`` is passed,
+   in which case copy ``lib/spam-patterns-fallback.json`` into
+   ``lib/generated/spam-patterns.json`` and continue with a loud
+   warning. The ``--seed`` variant runs the same logic but is a
+   no-op if the generated file already exists (used in
+   ``postinstall`` hooks).
+
+.. _client-hub-sdp-fail-closed:
+
+Fail-closed by default
+======================================================================
+
+Production builds fail-closed — if Client Hub is unreachable, the
+build fails and the previous successful build's deployed bundle
+keeps serving. The site never silently deploys with stale or empty
+patterns. Concretely:
+
+- ``"prebuild"`` runs the fetcher with NO ``--allow-fallback``
+  flag. Any fetch failure aborts the build.
+- ``"postinstall"`` runs ``fetch-spam-patterns.mjs --seed``. This
+  is idempotent — if ``lib/generated/spam-patterns.json`` already
+  exists (from a prior install) it does nothing. Used only to
+  give fresh clones a usable pattern file before their first
+  build attempt.
+
+.. _client-hub-sdp-predev-policy:
+
+``predev`` policy is per-site
+======================================================================
+
+Two valid choices — pick what fits each environment:
+
+**Permissive** (Clever Orchid choice): ``"predev"`` runs the
+fetcher with ``--allow-fallback``. Local ``npm run dev`` works in
+the absence of Client Hub credentials, useful for Docker Compose
+dev or first-time setup. Trade-off: a developer's local env won't
+surface a Client Hub outage.
+
+**Strict** (default if unsure): no ``"predev"`` hook, OR the same
+fail-closed fetch as ``"prebuild"``. Local dev requires the
+Client Hub creds in ``.env.local``. Trade-off: slightly more
+friction on first-time setup, but ``npm run dev`` and
+``npm run build`` behave identically.
+
+.. _client-hub-sdp-cross-site-invariant:
+
+Cross-site invariant
+======================================================================
+
+The diff between any two Web Factory sites' fetcher / filter /
+fallback files should be **only env-var values** (a different
+``CLIENTHUB_URL`` and ``CLIENTHUB_API_KEY`` per site). The script,
+the type interface, the fallback structure, and the runtime logic
+should all be drop-in identical. This is a deliberate property —
+spam-defense logic is canonical across all Client Hub deployments,
+which is the entire point of moving the patterns into Client Hub
+in the first place.
+
+When onboarding a new site:
+
+1. Copy ``scripts/fetch-spam-patterns.mjs``,
+   ``lib/spam-patterns-fallback.json``, and the
+   ``"prebuild"`` / ``"postinstall"`` hooks verbatim from an
+   existing site.
+2. Add the site's source-scoped ``CLIENTHUB_API_KEY`` and
+   ``CLIENTHUB_URL`` to its env (Vercel project / VPS ``.env``).
+3. Refactor the local filter module to import from
+   ``lib/generated/spam-patterns.json`` (replace the existing
+   hardcoded constants).
+4. Run ``npm run build`` once locally to confirm the prebuild
+   fetch succeeds and the deployed bundle catches the standard
+   payloads (``+235`` country code, ``calendly.com`` URL,
+   ``webdigital`` email substring, two-phrase combo).
 
 .. _client-hub-sdp-observability:
 

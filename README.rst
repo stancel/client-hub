@@ -289,7 +289,9 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
    * - Spam patterns (public)
      - ``GET /spam-patterns``
      - Source-key gated; consumer sites fetch canonical
-       blocklist patterns at build time
+       blocklist patterns at build time. Live across the two
+       deployed Web Factory sites since 2026-04-29 — pattern
+       updates fan out to every site on next deploy.
    * - Spam admin (root-key)
      - ``GET/POST /admin/spam-patterns``
        ``PUT/DELETE /admin/spam-patterns/{uuid}``

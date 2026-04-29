@@ -244,6 +244,78 @@ async def test_admin_spam_events_stats(client, auth_headers):
     assert isinstance(data["by_endpoint"], list)
 
 
+# =============================================================================
+# Fan-out — operator → public endpoint → live filter
+# =============================================================================
+@pytest.mark.asyncio
+async def test_new_pattern_visible_in_public_endpoint_and_blocks_immediately(
+    client, auth_headers
+):
+    """Operator adds a pattern via admin → public GET serves it → it actively
+    blocks a payload. Proves the canonical-source-of-truth fan-out path."""
+    new_substring = "fanout_test_marker_xyzzy_2026"
+
+    # Sanity: pattern is not present yet
+    pre = (await client.get("/api/v1/spam-patterns", headers=auth_headers)).json()
+    assert new_substring not in pre["email_substring"]
+
+    # Operator creates a new active pattern
+    create = await client.post(
+        "/api/v1/admin/spam-patterns",
+        headers=auth_headers,
+        json={
+            "pattern_kind": "email_substring",
+            "pattern": new_substring,
+            "notes": "fan-out integration test",
+        },
+    )
+    assert create.status_code == 201
+    pattern_uuid = create.json()["uuid"]
+
+    # The pattern should be visible in the public GET immediately.
+    # Consumer sites fetching this endpoint at build time would now ship
+    # with this pattern in their generated/spam-patterns.json.
+    post = (await client.get("/api/v1/spam-patterns", headers=auth_headers)).json()
+    assert new_substring in post["email_substring"]
+
+    # And it should actively block a matching submission right now —
+    # patterns are not cached in-process; every check loads from DB.
+    blocked = await client.post(
+        "/api/v1/contacts",
+        headers=auth_headers,
+        json={
+            "first_name": "Fanout",
+            "last_name": "Test",
+            "contact_type": "lead",
+            "emails": [
+                {"address": f"x@{new_substring}.com", "type": "personal", "is_primary": True}
+            ],
+            "phones": [
+                {"number": "5551239999", "type": "mobile", "is_primary": True}
+            ],
+        },
+    )
+    assert blocked.status_code == 422
+
+    # Operator soft-disables the pattern (is_active=false).
+    await client.put(
+        f"/api/v1/admin/spam-patterns/{pattern_uuid}",
+        headers=auth_headers,
+        json={"is_active": False},
+    )
+
+    # Now the pattern should NOT appear in the public GET (active-only).
+    after_disable = (await client.get(
+        "/api/v1/spam-patterns", headers=auth_headers
+    )).json()
+    assert new_substring not in after_disable["email_substring"]
+
+    # Cleanup — hard-delete the test pattern.
+    await client.delete(
+        f"/api/v1/admin/spam-patterns/{pattern_uuid}", headers=auth_headers
+    )
+
+
 @pytest.mark.asyncio
 async def test_admin_mark_false_positive_bumps_pattern_counter(client, auth_headers):
     # 1) Trigger a rejection caused by a pattern we control so we can verify

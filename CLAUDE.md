@@ -108,6 +108,8 @@ client-hub/
 
 **Spam-defense framework:** every public-ish endpoint inherits a 5-line spam guard via `app.services.spam_filter_service.spam_check_or_raise`. Patterns are DB-driven (`spam_patterns` table), rejections logged to `spam_events`, sliding-window rate-limit in `spam_rate_log`. See `docs/Spam-Defense-Pattern.rst` for the inheritance pattern when adding new integrations.
 
+**Consumer-site pattern sync (live since 2026-04-29):** Complete Dental Care and Clever Orchid websites pull their server-side filter blocklists from `GET /api/v1/spam-patterns` at build time (Next.js `prebuild` hook, fail-closed). Operators add/edit patterns once via `POST /api/v1/admin/spam-patterns` and both sites pick up the change on next deploy — Client Hub is the canonical source of truth. See the "Consumer-Site Pattern Sync" section of `docs/Spam-Defense-Pattern.rst` for the reference scaffolding (fetcher script, fallback file, gitignore, npm hooks).
+
 Auth: `X-API-Key` header on all protected routes. Multi-source
 model: one root key plus per-source scoped keys. Source attribution
 is auto-stamped on contacts and communications via
