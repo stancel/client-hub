@@ -446,10 +446,13 @@ Files
      - new (gitignored)
      - Rewritten on every prebuild from the live Client Hub
        response. Imported by the server-side filter module.
-   * - ``lib/spam-filter.ts`` (or ``lib/spam-defense.ts``)
+   * - ``lib/spam-filter.ts``
      - refactored
-     - Hardcoded array constants removed; replaced with imports
-       from ``lib/generated/spam-patterns.json``. New
+     - Canonical filename across all Web Factory sites (Clever
+       Orchid was renamed from ``lib/spam-defense.ts`` to match
+       on 2026-04-29). Hardcoded array constants removed;
+       replaced with imports from
+       ``lib/generated/spam-patterns.json``. New
        ``isBlockedPhoneCountry`` helper runs BEFORE the digit-
        count check (otherwise ``+235 6 89 50 54`` strips to 10
        digits and would falsely pass). Email blocklist now also
@@ -538,13 +541,20 @@ Cross-site invariant
 ======================================================================
 
 The diff between any two Web Factory sites' fetcher / filter /
-fallback files should be **only env-var values** (a different
+fallback files is **only env-var values** (a different
 ``CLIENTHUB_URL`` and ``CLIENTHUB_API_KEY`` per site). The script,
-the type interface, the fallback structure, and the runtime logic
-should all be drop-in identical. This is a deliberate property —
-spam-defense logic is canonical across all Client Hub deployments,
-which is the entire point of moving the patterns into Client Hub
-in the first place.
+the file paths, the type interface, the fallback structure, and
+the runtime logic are all byte-equivalent across sites. This is a
+deliberate property — spam-defense logic is canonical across all
+Client Hub deployments, which is the entire point of moving the
+patterns into Client Hub in the first place.
+
+Verified across both deployed sites (Complete Dental Care and
+Clever Orchid) on 2026-04-29 after Clever Orchid renamed its
+filter module to match the canonical name. The only allowed
+per-site variation is the ``predev`` policy (see "predev policy
+is per-site" above) — and even that is a deliberate operator
+choice, not accidental drift.
 
 When onboarding a new site:
 
