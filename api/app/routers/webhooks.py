@@ -12,6 +12,10 @@ from app.models.contact import Contact, ContactEmail, ContactPhone
 from app.models.invoice import Invoice, Payment
 from app.models.lookups import ChannelType, InvoiceStatus, PaymentMethod
 from app.models.source import Source
+from app.services.spam_filter_service import (
+    IntakePayload,
+    spam_check_or_raise,
+)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"], dependencies=[Depends(require_api_key)])
 
@@ -81,6 +85,23 @@ async def chatwoot_webhook(
         phone = sender.get("phone_number")
         email = sender.get("email")
         contact = None
+
+        # Spam guard — Chatwoot widget is public-facing on the consumer
+        # site, so messages here can carry the same spam payloads as a
+        # plain contact form. Run the filter before any DB write.
+        intake = IntakePayload(
+            email=email,
+            phone=phone,
+            body=data.get("content"),
+            remote_ip=(request.client.host if request.client else None),
+        )
+        await spam_check_or_raise(
+            db, intake,
+            source_id=ctx.source_id,
+            endpoint="/api/v1/webhooks/chatwoot",
+            integration_kind="webhook",
+            payload={"event": event, "sender": sender, "content": data.get("content")},
+        )
 
         if phone:
             cp = (await db.execute(select(ContactPhone).where(ContactPhone.phone_number == phone))).scalar_one_or_none()

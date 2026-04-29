@@ -11,6 +11,7 @@ from app.routers import (
     orders,
     organizations,
     settings,
+    spam,
     webhooks,
 )
 
@@ -37,3 +38,5 @@ app.include_router(communications.router, prefix="/api/v1")
 app.include_router(webhooks.router, prefix="/api/v1")
 app.include_router(settings.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
+app.include_router(spam.public_router, prefix="/api/v1")
+app.include_router(spam.admin_router, prefix="/api/v1")

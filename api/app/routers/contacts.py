@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -19,6 +19,40 @@ from app.services.contact_service import (
     list_contacts,
     serialize_external_refs,
 )
+from app.services.spam_filter_service import (
+    IntakePayload,
+    spam_check_or_raise,
+)
+
+
+def _extract_contact_intake(body: ContactCreate, request: Request) -> IntakePayload:
+    """Adapter: ContactCreate Pydantic body → normalized IntakePayload.
+
+    Pulls the first phone, first email, and synthesizes a "body" string from
+    any data_source / display_name + the body of the first inline affiliation
+    note for spam evaluation. The IP comes from the request connection.
+    """
+    first_phone = body.phones[0].number if body.phones else None
+    first_email = body.emails[0].address if body.emails else None
+    # Most contact-form spam lives in display_name + first/last + first email
+    # local-part. We don't get a "message body" through ContactCreate today —
+    # that travels via the companion POST /communications. Synthesize what we
+    # can to feed phrase/url checks anyway.
+    synth_body_parts = [body.first_name, body.last_name, body.display_name or ""]
+    if body.external_refs_json:
+        # Brad's site embeds the form body in external_refs_json.extra.message
+        # for some integrations; defensive-extract it if present.
+        extra = body.external_refs_json.get("extra") or {}
+        for k in ("message", "body", "note", "comment"):
+            v = extra.get(k)
+            if v:
+                synth_body_parts.append(str(v))
+    return IntakePayload(
+        email=first_email,
+        phone=first_phone,
+        body=" ".join(p for p in synth_body_parts if p),
+        remote_ip=(request.client.host if request.client else None),
+    )
 
 router = APIRouter(prefix="/contacts", tags=["contacts"], dependencies=[Depends(require_api_key)])
 
@@ -109,9 +143,18 @@ async def get_contact_endpoint(uuid: str, db: AsyncSession = Depends(get_db)):
 @router.post("", status_code=201)
 async def create_contact_endpoint(
     body: ContactCreate,
+    request: Request,
     ctx: SourceContext = Depends(require_api_key),
     db: AsyncSession = Depends(get_db),
 ):
+    intake = _extract_contact_intake(body, request)
+    await spam_check_or_raise(
+        db, intake,
+        source_id=ctx.source_id,
+        endpoint="/api/v1/contacts",
+        integration_kind="web_form",
+        payload=body.model_dump(mode="json"),
+    )
     try:
         contact = await create_contact(db, body.model_dump(), source_id=ctx.source_id)
     except ValueError as e:

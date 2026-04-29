@@ -1,6 +1,6 @@
 import uuid as uuid_mod
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,10 @@ from app.models.contact import Contact
 from app.models.lookups import ChannelType
 from app.models.order import Order
 from app.models.source import Source
+from app.services.spam_filter_service import (
+    IntakePayload,
+    spam_check_or_raise,
+)
 
 router = APIRouter(prefix="/communications", tags=["communications"], dependencies=[Depends(require_api_key)])
 
@@ -90,9 +94,28 @@ async def get_communication(uuid: str, db: AsyncSession = Depends(get_db)):
 @router.post("", status_code=201)
 async def create_communication(
     body: CommCreate,
+    request: Request,
     ctx: SourceContext = Depends(require_api_key),
     db: AsyncSession = Depends(get_db),
 ):
+    # Run the spam guard against the body's text fields BEFORE we touch the DB.
+    # We don't have email/phone on a CommCreate (the contact is referenced by
+    # uuid), so the filter only sees `body` content + IP — but that's enough
+    # for url/phrase patterns and rate-limit on body_hash.
+    intake = IntakePayload(
+        email=None,
+        phone=None,
+        body=body.body,
+        remote_ip=(request.client.host if request.client else None),
+    )
+    await spam_check_or_raise(
+        db, intake,
+        source_id=ctx.source_id,
+        endpoint="/api/v1/communications",
+        integration_kind="web_form",
+        payload=body.model_dump(mode="json"),
+    )
+
     contact = (await db.execute(select(Contact).where(Contact.uuid == body.contact_uuid))).scalar_one_or_none()
     if not contact:
         raise HTTPException(status_code=400, detail=f"Contact {body.contact_uuid} not found")
