@@ -224,6 +224,44 @@ clobbered OpsInsights compose patches.
   (rebuild path, drift correction) and Complete Dental Care
   (standard path)
 
+.. _client-hub-todo-phase13:
+
+Phase 13 — Spam-Defense Framework (API-level) [COMPLETE]
+======================================================================
+
+Defense-in-depth spam filter at the Client Hub ingestion layer.
+Every public-ish entry point inherits a 5-line guard via
+``app.services.spam_filter_service.spam_check_or_raise`` — future
+integrations (Zammad, marketing platform, scheduling, scraping,
+etc.) plug in identically.
+
+- [x] ``docs/Spam-Defense-Pattern.rst`` — full design contract +
+  inheritance pattern documentation
+- [x] Migration 023 — ``spam_patterns`` (operator-managed library),
+  ``spam_events`` (rejection log for analytics + ETL),
+  ``spam_rate_log`` (sliding-window rate-limit state)
+- [x] Seeded 39 default patterns from the consumer-site filter
+  lists (Complete Dental Care + Clever Orchid)
+- [x] ``app/services/spam_filter_service.py`` — IntakePayload,
+  SpamVerdict, ``spam_check_or_raise``, full pattern/event admin
+  service surface
+- [x] ``app/routers/spam.py`` — 6 admin endpoints + 1 source-key
+  gated public endpoint for consumer-site pattern sync
+- [x] Wired into ``POST /api/v1/contacts``,
+  ``POST /api/v1/communications``, and
+  ``POST /api/v1/webhooks/chatwoot``
+- [x] False-positive correction path (operator marks event,
+  pattern's ``false_positive_count`` bumps automatically)
+- [x] Mode C (hard reject + dedicated ``spam_events`` log)
+  preserves attack history without polluting primary tables
+- [x] DB-driven patterns enable ops updates without code deploys;
+  per-pattern hit/false-positive analytics built in
+- [x] Multi-worker safe rate-limit via DB table (no Redis)
+- [x] 13 new tests (114 total, was 101); ruff + rstcheck clean
+- [x] Phone validation: US-only (10 digits, or 11 starting with 1)
+  enforced framework-side; foreign country-code patterns block
+  obvious offshore mills
+
 .. _client-hub-todo-future:
 
 Future — Planned Work

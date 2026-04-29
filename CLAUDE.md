@@ -10,8 +10,8 @@
 - **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
-- **Schema:** 36 tables + 3 views in `clienthub` (3NF)
-- **API:** 30 endpoint paths, 101 tests passing
+- **Schema:** 39 tables + 3 views in `clienthub` (3NF)
+- **API:** 36 endpoint paths, 114 tests passing
 - **SDKs:** Python, PHP, TypeScript (auto-generated)
 - **CI/CD:** GitHub Actions (lint → test → build → SDK gen)
 - **Deployment:** one-line installer (`scripts/install.sh`); first
@@ -68,8 +68,8 @@ The API container runs on `my-main-net` and connects to `mariadb:3306`.
 client-hub/
 ├── api/                                  # FastAPI application (Python 3.12)
 │   ├── app/                              # Models, routers, schemas, services, middleware
-│   └── tests/                            # 101 tests across 18 files
-├── migrations/                           # 21 numbered SQL migrations (001-022; 012 in dev/)
+│   └── tests/                            # 114 tests across 19 files
+├── migrations/                           # 22 numbered SQL migrations (001-023; 012 in dev/)
 │   └── dev/                              # Dev/CI-only seed data (012_seed_test_data.sql)
 ├── scripts/                              # install.sh, uninstall.sh, bootstrap-migrations.sh,
 │                                         # upgrade.sh, generate-sdks.sh, smoke-test.sh,
@@ -88,7 +88,7 @@ client-hub/
                                           # (gitignored; only present after OpsInsights setup)
 ```
 
-## API Endpoints (30 paths)
+## API Endpoints (36 paths)
 
 | Category | Endpoints |
 |---|---|
@@ -103,6 +103,10 @@ client-hub/
 | Webhooks | `POST /api/v1/webhooks/invoiceninja`, `POST /api/v1/webhooks/chatwoot` |
 | Settings | `GET/PUT /api/v1/settings` |
 | Admin | `GET/POST /api/v1/admin/sources`, `GET/PUT/DELETE /api/v1/admin/sources/{uuid}`, source-scoped API key CRUD, `GET /api/v1/admin/events` (root-key-only) |
+| Spam patterns (public) | `GET /api/v1/spam-patterns` (source-key gated; consumer-site sync) |
+| Spam admin (root-key) | `GET/POST /api/v1/admin/spam-patterns`, `PUT/DELETE /api/v1/admin/spam-patterns/{uuid}`, `GET /api/v1/admin/spam-events`, `GET /api/v1/admin/spam-events/stats`, `POST /api/v1/admin/spam-events/{uuid}/mark-false-positive` |
+
+**Spam-defense framework:** every public-ish endpoint inherits a 5-line spam guard via `app.services.spam_filter_service.spam_check_or_raise`. Patterns are DB-driven (`spam_patterns` table), rejections logged to `spam_events`, sliding-window rate-limit in `spam_rate_log`. See `docs/Spam-Defense-Pattern.rst` for the inheritance pattern when adding new integrations.
 
 Auth: `X-API-Key` header on all protected routes. Multi-source
 model: one root key plus per-source scoped keys. Source attribution

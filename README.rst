@@ -114,11 +114,11 @@ Quick Info
    * - **DB Name**
      - ``clienthub``
    * - **Schema**
-     - 36 tables + 3 views (3NF normalized)
+     - 39 tables + 3 views (3NF normalized)
    * - **API Endpoints**
-     - 30 paths across 11 routers
+     - 36 paths across 12 routers
    * - **Test Suite**
-     - 101 tests across 18 files
+     - 114 tests across 19 files
    * - **SDKs**
      - Python, PHP, TypeScript (auto-generated from OpenAPI)
    * - **CI/CD**
@@ -153,7 +153,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    ┌─────────────────────────────────────────┐
    │         client-hub-api (FastAPI)        │
    │         Port 8800 on my-main-net       │
-   │    30 endpoints, API key auth          │
+   │    36 endpoints, API key auth          │
    │    Swagger UI at /docs                 │
    └─────────────────┬───────────────────────┘
                      │ SQLAlchemy (async)
@@ -286,6 +286,18 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
        ``GET /admin/events``
      - Source + API key management; cross-source event
        stream (root-key-only)
+   * - Spam patterns (public)
+     - ``GET /spam-patterns``
+     - Source-key gated; consumer sites fetch canonical
+       blocklist patterns at build time
+   * - Spam admin (root-key)
+     - ``GET/POST /admin/spam-patterns``
+       ``PUT/DELETE /admin/spam-patterns/{uuid}``
+       ``GET /admin/spam-events``
+       ``GET /admin/spam-events/stats``
+       ``POST /admin/spam-events/{uuid}/mark-false-positive``
+     - Spam-pattern library CRUD, rejection log,
+       attack analytics, false-positive correction
 
 .. _client-hub-database-summary:
 
@@ -293,7 +305,7 @@ Base URL: ``http://10.0.1.220:8800/api/v1``
 Database Schema
 **********************************************************************
 
-36 tables + 3 views in ``clienthub``, normalized to 3NF.
+39 tables + 3 views in ``clienthub``, normalized to 3NF.
 
 **Entity tables (19):** api_keys, business_settings, contacts,
 organizations, contact_phones, contact_emails, contact_addresses,
@@ -310,8 +322,15 @@ address_types, channel_types, marketing_sources, order_statuses,
 order_item_types, invoice_statuses, payment_methods, tags, sources,
 seniority_levels (added migration 019)
 
-**System tables (1):** ``_schema_migrations`` — migration tracking
-(added in migration 018)
+**System / observability tables (4):**
+
+- ``_schema_migrations`` — migration tracking (added migration 018)
+- ``spam_patterns`` — operator-managed spam-pattern library
+  (added migration 023)
+- ``spam_events`` — every rejection logged for analytics + ETL
+  (added migration 023)
+- ``spam_rate_log`` — sliding-window rate-limit state
+  (added migration 023)
 
 **Views (3):**
 
@@ -351,7 +370,7 @@ Testing
 **********************************************************************
 
 Test Driven Development (TDD) — every endpoint has tests.
-101 tests across 18 files, all hitting the real database.
+114 tests across 19 files, all hitting the real database.
 
 .. code-block:: bash
 
@@ -451,11 +470,11 @@ Project Structure
    │   │   ├── database.py
    │   │   ├── models/                       # SQLAlchemy ORM models
    │   │   ├── schemas/                      # Pydantic request/response
-   │   │   ├── routers/                      # Endpoint handlers (11 routers)
+   │   │   ├── routers/                      # Endpoint handlers (12 routers)
    │   │   ├── services/                     # Business logic
    │   │   └── middleware/                   # API key auth (root + source-scoped)
-   │   └── tests/                            # 101 tests, 18 files
-   ├── migrations/                           # 21 numbered SQL files (001-022)
+   │   └── tests/                            # 114 tests, 19 files
+   ├── migrations/                           # 22 numbered SQL files (001-023)
    │   └── dev/                              # Dev/CI-only seed data
    │       └── 012_seed_test_data.sql
    ├── scripts/                              # 12 shell scripts
@@ -476,12 +495,13 @@ Project Structure
    │   ├── python/
    │   ├── php/
    │   └── typescript/
-   ├── docs/                                 # RST documentation (17 files)
+   ├── docs/                                 # RST documentation (18 files)
    │   ├── architecture.rst
    │   ├── data-model.rst
    │   ├── api-design.rst
    │   ├── ci-cd.rst
    │   ├── Migration-Strategy.rst
+   │   ├── Spam-Defense-Pattern.rst
    │   ├── Multi-Source.rst
    │   ├── Deployment.rst
    │   ├── Upgrade.rst

@@ -4,6 +4,122 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-2026-04-29:
+
+2026-04-29 — Spam-Defense Framework (API-level)
+==========================================================================
+
+Defense-in-depth spam filter at the Client Hub API ingestion layer.
+Three sites (Complete Dental Care, Clever Orchid, this Client Hub
+itself) now share the same canonical pattern library, with Client
+Hub as the single source of truth that consumer sites pull from.
+
+**Mode:** hard reject (HTTP 422) at ingestion, with every rejection
+logged to a dedicated ``spam_events`` table for analytics + ETL.
+Primary entity tables (``contacts``, ``communications``, ``orders``,
+etc.) stay clean — no ``is_spam`` columns to filter against, no FK
+pollution risk. Attack history is fully preserved and queryable.
+
+**Migration 023 (``spam_patterns_and_events.sql``):**
+
+- ``spam_patterns`` — operator-managed pattern library. Five
+  ``pattern_kind`` values: ``email_substring``, ``full_email_block``,
+  ``url_regex``, ``phrase_regex``, ``phone_country_block``.
+  Per-pattern ``hit_count``, ``last_hit_at``, ``false_positive_count``
+  for built-in analytics.
+- ``spam_events`` — every rejection with denormalized
+  ``matched_pattern_text`` (survives pattern deletion),
+  ``rejection_reason``, redacted ``payload_json``, ``remote_ip``,
+  ``submitted_email/phone/body_hash``, ``endpoint``,
+  ``integration_kind``, ``occurred_at``, ``was_false_positive``.
+- ``spam_rate_log`` — sliding-window rate-limit state (10-min
+  window). Multi-worker safe via DB; no Redis dependency added.
+- Seeded 39 default patterns from the consumer-site filter lists
+  (the same regex/substring families that catch the SEO outreach
+  mills, Calendly lead-gen pitches, foreign country-code phones).
+
+**API surface (``/api/v1`` — 36 paths now, was 30):**
+
+- ``GET /spam-patterns`` — source-key gated; consumer sites fetch
+  this at build time to keep their server-side filter in sync with
+  Client Hub's canonical list. One source of truth fans out to
+  every Web Factory site on next deploy.
+- ``GET/POST/PUT/DELETE /admin/spam-patterns`` — root-key, full
+  pattern CRUD with metadata visibility.
+- ``GET /admin/spam-events`` — root-key, paginated rejection log
+  with filters by endpoint / integration_kind / rejection_reason /
+  submitted_email / was_false_positive.
+- ``GET /admin/spam-events/stats`` — root-key, attack analytics
+  (hits per endpoint, hits per pattern with false-positive rates,
+  top attacker IPs).
+- ``POST /admin/spam-events/{uuid}/mark-false-positive`` —
+  root-key, marks an event as a false positive and bumps the
+  matched pattern's ``false_positive_count``.
+
+**Reusable inheritance pattern:**
+
+Every protected endpoint declares an integration adapter
+(``_extract_intake(body, request)``) plus a one-line
+``await spam_check_or_raise(...)`` call before the DB write. New
+integrations (Zammad, marketing platforms, scheduling, scraping)
+plug in with five lines of glue and inherit all current and future
+spam patterns + rate limiting + observability automatically.
+
+**Wired in this release:**
+
+- ``POST /api/v1/contacts`` — web_form integration_kind
+- ``POST /api/v1/communications`` — web_form integration_kind
+- ``POST /api/v1/webhooks/chatwoot`` — webhook integration_kind
+  (public-facing widget surface)
+
+**Code:**
+
+- New ``app/models/spam.py`` — SQLAlchemy models for
+  ``SpamPattern``, ``SpamEvent``. ``spam_rate_log`` accessed via
+  raw SQL for hot-path performance.
+- New ``app/schemas/spam.py`` — Pydantic shapes for public read,
+  admin CRUD, event list, stats payload.
+- New ``app/services/spam_filter_service.py`` — the engine.
+  ``IntakePayload``, ``SpamVerdict``, ``spam_check_or_raise``,
+  pattern/event admin helpers. Validates regex on pattern create.
+  Phone digit-count check (US-only, exactly 10 digits or 11
+  starting with 1) is framework-level, not pattern-driven.
+- New ``app/routers/spam.py`` — public + admin routers, registered
+  in ``app/main.py``.
+- ``contacts.py`` / ``communications.py`` / ``webhooks.py`` —
+  thin adapters and one-line guard calls.
+
+**Tests:** 13 new tests in ``tests/test_spam_filter.py``
+(public read auth, admin pattern CRUD with regex validation,
+rejection paths via ``POST /contacts`` for each pattern kind,
+clean-payload acceptance, event listing/stats, false-positive
+mark-and-counter-bump). 114 tests total (was 101). Pytest +
+ruff + rstcheck all clean.
+
+**Test-isolation fix:** ``tests/conftest.py`` now includes a
+session-scope fixture that wipes ``spam_rate_log`` and
+``spam_events`` at session start. The rate-limit log persists
+across pytest runs by design (durable, multi-worker-safe in
+production), but that meant a clean-payload test from a prior
+run could rate-limit the same submission within the 10-min
+window. The fixture gives every run a clean slate while leaving
+the seeded ``spam_patterns`` library intact.
+
+**Documentation:**
+
+- New ``docs/Spam-Defense-Pattern.rst`` — full design doc,
+  including inheritance pattern for future integrations.
+- ``CLAUDE.md``, ``README.rst`` — synced with new endpoint counts
+  (36 paths, was 30), table counts (39, was 36), test counts
+  (114, was 101), router count (12, was 11), migration count
+  (22 numbered files, was 21), docs/ count (18 files, was 17).
+- TODO Phase 13 entry tracking everything above.
+
+**SDK regeneration deferred to CI:** the local generate-sdks.sh
+hit the same root-owned-files issue as the 2026-04-24 multi-org
+release; the CI ``generate-sdks`` job on master merge regenerates
+fresh.
+
 .. _client-hub-changelog-2026-04-24b:
 
 2026-04-24 — Live VPS Upgrades + Operational Hardening
