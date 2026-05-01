@@ -82,7 +82,7 @@ Docker DNS (``mariadb:3306``).
    ┌─────────────────────────────────────────┐
    │    client-hub-api (FastAPI)             │
    │    Port 8800 on my-main-net            │
-   │    30 endpoints, X-API-Key auth        │
+   │    37 endpoints, X-API-Key auth        │
    │    Swagger: /docs  OpenAPI: /openapi.json│
    └─────────────────┬───────────────────────┘
                      │ SQLAlchemy async (aiomysql)
@@ -91,7 +91,7 @@ Docker DNS (``mariadb:3306``).
    │    Shared MariaDB 12.2.2               │
    │    ~/docker/mariadb/ (port 3306)       │
    │    Database: clienthub                │
-   │    36 tables + 3 views (3NF)           │
+   │    39 tables + 3 views (3NF)           │
    └─────────────────────────────────────────┘
           ▲                    ▲
           │                    │
@@ -119,11 +119,15 @@ Database Configuration
    * - Host access
      - ``10.0.1.220:3306``
    * - Tables
-     - 31 (18 entity + 2 junction + 11 lookup)
+     - 39 (19 entity + 1 identity/auth + 3 junction + 12 lookup +
+       3 spam-defense + 1 system). See ``docs/data-model.rst`` for
+       the full breakdown.
    * - Views
-     - 2 (``v_contact_summary``, ``v_contact_last_order``)
+     - 3 (``v_contact_summary``, ``v_contact_last_order``,
+       ``v_events_by_source``)
    * - Migrations
-     - 13 files in ``migrations/``
+     - 28 files in ``migrations/`` (numbered 001-029, with 012 in
+       ``migrations/dev/`` as CI/dev seed data)
 
 .. _client-hub-arch-env:
 
@@ -172,22 +176,29 @@ Pydantic v2.
      - Purpose
    * - Routers
      - ``api/app/routers/``
-     - Endpoint handlers (11 router modules)
+     - Endpoint handlers (13 router modules including
+       ``marketing_sources.py`` and ``spam.py``)
    * - Services
      - ``api/app/services/``
-     - Business logic (contact, lookup, webhook)
+     - Business logic (contact, lookup, webhook, phone_utils,
+       request_meta, marketing_source_service,
+       spam_filter_service, etc.)
    * - Models
      - ``api/app/models/``
-     - SQLAlchemy ORM (7 model modules)
+     - SQLAlchemy ORM (~10 model modules)
    * - Schemas
      - ``api/app/schemas/``
-     - Pydantic request/response validation
+     - Pydantic request/response validation (the
+       ``ContactCreatePhone.number`` validator coerces inbound
+       phones to E.164 — see ``docs/data-model.rst``)
    * - Middleware
      - ``api/app/middleware/``
-     - API key authentication
+     - API key authentication; resolves ``X-API-Key`` →
+       ``api_keys`` row → parent ``sources`` row → stamps
+       ``ctx.source_id`` onto every authenticated write
    * - Tests
      - ``api/tests/``
-     - 101 tests across 18 files (TDD, real DB)
+     - 180 tests across 22 files (TDD, real DB)
 
 .. _client-hub-arch-data-model:
 

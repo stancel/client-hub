@@ -10,7 +10,8 @@ Phase 1 — Data Model Design [COMPLETE]
 ======================================================================
 
 - [x] Design 3NF data model (initial: 31 tables + 2 views;
-  current after Phases 8–9: 34 tables + 3 views)
+  after Phases 8–9: 34 tables + 3 views; latest after Phase 16:
+  39 tables + 3 views)
 - [x] Document all tables, columns, types, constraints, indexes, FKs
 - [x] Document normalization rationale (1NF, 2NF, 3NF analysis)
 - [x] Document junction tables and why they exist

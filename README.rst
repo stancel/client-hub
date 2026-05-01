@@ -113,24 +113,33 @@ Quick Info
      - ``mariadb:3306`` (Docker DNS) / ``10.0.1.220:3306`` (host)
    * - **DB Name**
      - ``clienthub``
+   * - **Version**
+     - 0.3.3 (single source of truth: ``api/VERSION``;
+       git-tagged ``vX.Y.Z`` per release)
    * - **Schema**
-     - 39 tables + 3 views (3NF normalized)
+     - 39 tables + 3 views (3NF normalized; through migration 029)
    * - **API Endpoints**
-     - 36 paths across 12 routers
+     - 37 paths across 13 routers
    * - **Test Suite**
-     - 114 tests across 19 files
+     - 180 tests across 22 files
    * - **SDKs**
      - Python, PHP, TypeScript (auto-generated from OpenAPI)
    * - **CI/CD**
      - GitHub Actions (lint → test → build → SDK gen)
    * - **MCP Tools**
      - ``apisix-mysql`` (``execute_sql``, ``search_objects``)
-   * - **Production deployment**
-     - First instance live at
+   * - **Production deployments**
+     - Two instances live on v0.3.3:
        ``client-hub-complete-dental-care.onlinesalessystems.com``
+       (Complete Dental Care) and
+       ``client-hub-clever-orchid.onlinesalessystems.com``
+       (Clever Orchid).
    * - **Status**
-     - All phases complete. First live integration running
-       (Complete Dental Care Next.js site).
+     - All phases through 16 complete. Two live integrations
+       running (Complete Dental Care and Clever Orchid Next.js
+       sites). Both VPSes carry the v0.3.x hardening: phone E.164
+       normalization, marketing-source attribution, source-discipline
+       enforcement, business_settings populated.
 
 .. _client-hub-architecture-summary:
 
@@ -153,7 +162,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    ┌─────────────────────────────────────────┐
    │         client-hub-api (FastAPI)        │
    │         Port 8800 on my-main-net       │
-   │    36 endpoints, API key auth          │
+   │    37 endpoints, API key auth          │
    │    Swagger UI at /docs                 │
    └─────────────────┬───────────────────────┘
                      │ SQLAlchemy (async)
@@ -162,7 +171,7 @@ and runs a FastAPI container (``client-hub-api``) on ``my-main-net``.
    │     Shared MariaDB 12.2.2              │
    │     ~/docker/mariadb/ (port 3306)      │
    │     Database: clienthub               │
-   │     36 tables + 3 views (3NF)          │
+   │     39 tables + 3 views (3NF)          │
    └─────────────────────────────────────────┘
 
    Also accessible via:
@@ -315,13 +324,20 @@ org_phones, org_emails, org_addresses, contact_channel_prefs,
 contact_preferences, contact_notes, orders, order_items,
 order_status_history, invoices, payments, communications
 
-**Junction tables (3):** contact_tag_map, contact_marketing_sources,
-contact_org_affiliations (added migration 019; replaces the dropped
-``contacts.organization_id`` cached pointer)
+**Identity / auth tables (1):** sources (every authenticated
+integration; ``domain`` populated migration 028; orphan ``bootstrap``
+rows dropped via migration 029). Promoted out of the lookup-tables
+list in v0.3.3 — it's the runtime identity of an integration, not a
+controlled-vocabulary lookup. See ``docs/Sources.rst``.
 
-**Lookup tables (13):** contact_types, phone_types, email_types,
+**Junction tables (3):** contact_tag_map, contact_marketing_sources
+(carries ``source_detail in ('explicit','derived','derived-backfill')``
+since v0.3.0), contact_org_affiliations (added migration 019;
+replaces the dropped ``contacts.organization_id`` cached pointer)
+
+**Lookup tables (12):** contact_types, phone_types, email_types,
 address_types, channel_types, marketing_sources, order_statuses,
-order_item_types, invoice_statuses, payment_methods, tags, sources,
+order_item_types, invoice_statuses, payment_methods, tags,
 seniority_levels (added migration 019)
 
 **System / observability tables (4):**
@@ -372,7 +388,7 @@ Testing
 **********************************************************************
 
 Test Driven Development (TDD) — every endpoint has tests.
-114 tests across 19 files, all hitting the real database.
+180 tests across 22 files, all hitting the real database.
 
 .. code-block:: bash
 
@@ -472,14 +488,15 @@ Project Structure
    │   │   ├── database.py
    │   │   ├── models/                       # SQLAlchemy ORM models
    │   │   ├── schemas/                      # Pydantic request/response
-   │   │   ├── routers/                      # Endpoint handlers (12 routers)
+   │   │   ├── routers/                      # Endpoint handlers (13 routers)
    │   │   ├── services/                     # Business logic
    │   │   └── middleware/                   # API key auth (root + source-scoped)
-   │   └── tests/                            # 114 tests, 19 files
-   ├── migrations/                           # 22 numbered SQL files (001-023)
+   │   ├── VERSION                           # Source of truth — read by FastAPI at startup, stamped into SDKs
+   │   └── tests/                            # 180 tests, 22 files
+   ├── migrations/                           # 28 numbered SQL files (001-029)
    │   └── dev/                              # Dev/CI-only seed data
    │       └── 012_seed_test_data.sql
-   ├── scripts/                              # 12 shell scripts
+   ├── scripts/                              # 12 shell scripts + 7 one-shot SQL scripts
    │   ├── install.sh                        # One-line production installer
    │   ├── uninstall.sh                      # Preserves .env + install summary
    │   ├── upgrade.sh                        # Coordinated VPS upgrade runner
@@ -497,7 +514,7 @@ Project Structure
    │   ├── python/
    │   ├── php/
    │   └── typescript/
-   ├── docs/                                 # RST documentation (18 files)
+   ├── docs/                                 # RST documentation (19 files)
    │   ├── architecture.rst
    │   ├── data-model.rst
    │   ├── api-design.rst

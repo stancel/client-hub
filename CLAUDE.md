@@ -10,13 +10,18 @@
 - **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
-- **Schema:** 39 tables + 3 views in `clienthub` (3NF)
-- **API:** 36 endpoint paths, 114 tests passing
+- **Version:** 0.3.3 (single source of truth: `api/VERSION`; FastAPI
+  reads it at startup; SDKs stamped via `scripts/generate-sdks.sh`;
+  git tagged `vX.Y.Z`)
+- **Schema:** 39 tables + 3 views in `clienthub` (3NF; through
+  migration 029)
+- **API:** 37 endpoint paths, 180 tests passing
 - **SDKs:** Python, PHP, TypeScript (auto-generated)
 - **CI/CD:** GitHub Actions (lint → test → build → SDK gen)
-- **Deployment:** one-line installer (`scripts/install.sh`); first
-  production VPS running at
-  `client-hub-complete-dental-care.onlinesalessystems.com`
+- **Deployment:** one-line installer (`scripts/install.sh`); two
+  production VPSes running v0.3.3:
+  - `client-hub-complete-dental-care.onlinesalessystems.com` (CDC)
+  - `client-hub-clever-orchid.onlinesalessystems.com` (Clever Orchid)
 
 ### Data Sources That Feed Into Client Hub
 
@@ -68,8 +73,9 @@ The API container runs on `my-main-net` and connects to `mariadb:3306`.
 client-hub/
 ├── api/                                  # FastAPI application (Python 3.12)
 │   ├── app/                              # Models, routers, schemas, services, middleware
-│   └── tests/                            # 114 tests across 19 files
-├── migrations/                           # 22 numbered SQL migrations (001-023; 012 in dev/)
+│   ├── VERSION                           # Single source of truth — read by FastAPI at startup, stamped into SDKs by generate-sdks.sh, mirrored in the vX.Y.Z git tag
+│   └── tests/                            # 180 tests across 22 files
+├── migrations/                           # 28 numbered SQL migrations (001-029; 012 in dev/)
 │   └── dev/                              # Dev/CI-only seed data (012_seed_test_data.sql)
 ├── scripts/                              # install.sh, uninstall.sh, bootstrap-migrations.sh,
 │                                         # upgrade.sh, generate-sdks.sh, smoke-test.sh,
@@ -88,12 +94,12 @@ client-hub/
                                           # (gitignored; only present after OpsInsights setup)
 ```
 
-## API Endpoints (36 paths)
+## API Endpoints (37 paths)
 
 | Category | Endpoints |
 |---|---|
 | Health | `GET /api/v1/health` |
-| Lookup | `GET /api/v1/lookup/phone/{number}`, `GET /api/v1/lookup/email/{email}` |
+| Lookup | `GET /api/v1/lookup/phone/{number}`, `GET /api/v1/lookup/email/{email}` (phone is normalized to E.164 server-side; format-agnostic) |
 | Contacts | CRUD + convert + summary + marketing opt-outs + preferences |
 | Affiliations | `GET/POST /api/v1/contacts/{uuid}/affiliations`, `PUT/DELETE /api/v1/contacts/{uuid}/affiliations/{affiliation_uuid}` (multi-org junction; primary auto-promotes/demotes) |
 | Organizations | CRUD |
@@ -105,6 +111,7 @@ client-hub/
 | Admin | `GET/POST /api/v1/admin/sources`, `GET/PUT/DELETE /api/v1/admin/sources/{uuid}`, source-scoped API key CRUD, `GET /api/v1/admin/events` (root-key-only) |
 | Spam patterns (public) | `GET /api/v1/spam-patterns` (source-key gated; consumer-site sync) |
 | Spam admin (root-key) | `GET/POST /api/v1/admin/spam-patterns`, `PUT/DELETE /api/v1/admin/spam-patterns/{uuid}`, `GET /api/v1/admin/spam-events`, `GET /api/v1/admin/spam-events/stats`, `POST /api/v1/admin/spam-events/{uuid}/mark-false-positive` |
+| Marketing sources (public) | `GET /api/v1/marketing-sources` (source-key gated; consumer-site sync of canonical attribution codes — mirrors `/spam-patterns`) |
 
 **Spam-defense framework:** every public-ish endpoint inherits a 5-line spam guard via `app.services.spam_filter_service.spam_check_or_raise`. Patterns are DB-driven (`spam_patterns` table, 57 seeded across migrations 023 + 024), rejections logged to `spam_events`, sliding-window rate-limit (10 min window) in `spam_rate_log` with per-key thresholds: `email=1`, `email_body_hash=1`, `ip=5`. Soft-signal events (single-phrase grazes below the rejection threshold) are logged as `rejection_reason='soft_signal'` for operator review without rejection. See `docs/Spam-Defense-Pattern.rst` for the inheritance pattern when adding new integrations.
 
@@ -113,6 +120,8 @@ client-hub/
 **Phone-number storage (v0.3.0+):** every phone number in `contact_phones.phone_number` and `org_phones.phone_number` is stored in **E.164** format (`+15558675309`) and protected by a DB-level CHECK constraint. Normalization happens at the API boundary via `app.services.phone_utils.normalize_to_e164`, which is wired into the Pydantic `ContactCreatePhone.number` validator. The `GET /api/v1/lookup/phone/{number}` endpoint normalizes the path parameter the same way, so SIP/CTI callers can pass any common format and resolve to the canonical row. Consumer sites do not need to format phones — submit whatever the form collects.
 
 **Marketing-source attribution:** every contact gets one or more `marketing_sources` codes via the `contact_marketing_sources` junction. `POST /api/v1/contacts` accepts `marketing_sources: list[str]` (explicit codes from the consumer site, always wins); when empty, `app.services.marketing_source_service.derive_codes()` derives from `external_refs_json` (UTM params, then referrer hostname, defaulting to `website`). Junction rows carry `source_detail = "explicit" | "derived" | "derived-backfill"` so analytics can distinguish. Consumer sites pull the canonical code list from `GET /api/v1/marketing-sources` (source-key gated; mirrors `/spam-patterns`).
+
+**Source-discipline rule (v0.3.3+):** every consumer integration must have its own named `sources` row and at least one `api_keys` row attached to it. The seeded `bootstrap` row exists only to bootstrap an empty install — it should be renamed (one-tenant case) or supplemented with named rows (multi-source case) and never used as a runtime identity. `scripts/install.sh` enforces this — `--first-source-code` is required and rejects `bootstrap`. `business_settings` (the singleton describing the business that owns this Client Hub instance) is also populated at install time via `--business-name` (required) plus optional type/timezone/currency/country/phone/email/website flags. See `docs/Sources.rst` for the full contract.
 
 **Consumer-site pattern sync (live since 2026-04-29):** Complete Dental Care and Clever Orchid websites pull their server-side filter blocklists from `GET /api/v1/spam-patterns` at build time (Next.js `prebuild` hook, fail-closed). Operators add/edit patterns once via `POST /api/v1/admin/spam-patterns` and both sites pick up the change on next deploy — Client Hub is the canonical source of truth. See the "Consumer-Site Pattern Sync" section of `docs/Spam-Defense-Pattern.rst` for the reference scaffolding (fetcher script, fallback file, gitignore, npm hooks).
 
@@ -218,7 +227,7 @@ docker compose down && docker compose build --no-cache && docker compose up -d
 
 Every API endpoint has a corresponding test. Tests hit the real database.
 
-- **101 tests** across 18 test files
+- **180 tests** across 22 test files
 - Framework: pytest + httpx + AsyncClient
 - Run: `cd api && .venv/bin/python -m pytest tests/ -v`
 - Coverage: `pytest --cov=app --cov-report=term-missing`
