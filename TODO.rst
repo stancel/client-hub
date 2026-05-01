@@ -414,13 +414,39 @@ changelog entry.
 Phase 16 — v0.3.1 follow-ups [COMPLETE]
 ----------------------------------------------------------------------
 
-- [x] Migration 028 — ``sources.domain`` backfill (CDC →
-  ``completedentalcarecolumbia.com``, CO → ``cleverorchid.com``);
-  VPS-safe, idempotent
+- [x] Migration 028 — ``sources.domain`` backfill (idempotent,
+  code-keyed). Applied on CDC; CDC's
+  ``complete_dental_care_website`` row now has
+  ``domain='completedentalcarecolumbia.com'``
 - [x] ``scripts/cleanup-prod-test-pollution.sql`` — body-marker-keyed
   removal of three prod-pollution test contacts
-- [ ] Deploy v0.3.1 to CDC: run migration 028 + cleanup SQL
-- [ ] Deploy v0.3.1 to Clever Orchid: run migration 028 + cleanup SQL
+- [x] Deploy v0.3.1 to CDC: contacts went 5 → 4 (Brad Stancel test
+  row removed); domain populated
+- [x] Deploy v0.3.1 to Clever Orchid: contacts went 17 → 15 (Mary T
+  TEST-FROM-CLAUDE-S5 and "Repeat" rate-limit test rows removed)
+
+**Discovered during the v0.3.1 deploy** — the CO instance has *no
+named source row*. There is only the ``bootstrap`` source (the
+install-time root key) and the consumer Next.js site has been
+authenticating as that key, not a dedicated ``clever_orchid_website``
+source. CDC was installed correctly with its own named source; CO
+was not. Migration 028's ``UPDATE ... WHERE code='clever_orchid_website'``
+was therefore a no-op on CO. This is an installation gap, not data
+loss, but it muddies attribution (every CO contact has
+``first_seen_source_id = bootstrap``).
+
+- [ ] Create a dedicated ``clever_orchid_website`` source on CO
+  (POST /api/v1/admin/sources with the proper code, name, type,
+  domain) and a per-source API key
+- [ ] Issue KT prompt to the Clever Orchid Next.js site to rotate
+  ``CLIENTHUB_API_KEY`` to the new per-source key, then redeploy
+- [ ] After the consumer-site rotation, deprecate (delete) any
+  remaining ``bootstrap``-key rows that aren't the install-time
+  root operator key
+- [ ] Document the "every consumer integration must have its own
+  named source + key, never the bootstrap key" rule in
+  ``docs/Spam-Defense-Pattern.rst`` (or a new ``Sources.rst``) so
+  future installs don't repeat this gap
 
 .. _client-hub-todo-future:
 
