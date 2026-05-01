@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "clienthub"
-version = "0.3.1"
+version = "0.3.2"
 description = "Client Hub API"
 authors = ["OpenAPI Generator Community <team@openapitools.org>"]
 license = "NoLicense"

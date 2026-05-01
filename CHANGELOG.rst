@@ -4,10 +4,53 @@
 Client Hub — Changelog
 ######################################################################
 
-.. _client-hub-changelog-v0-3-1:
+.. _client-hub-changelog-v0-3-2:
 
-v0.3.1 — 2026-05-01 — sources.domain backfill + prod test-data cleanup
-======================================================================
+v0.3.2 — 2026-05-01 — Sources cleanup: drop orphan bootstrap, rename CO
+=======================================================================
+
+The ``sources`` table's seeded ``bootstrap`` row carries the
+description "Initial source created by the installer. Rename or
+create additional sources as needed." The current installs landed
+in two different states relative to that guidance:
+
+- **Complete Dental Care** correctly created ``complete_dental_care_website``
+  alongside, and the install-generated API key was attached to that
+  row. ``bootstrap`` was left behind unused (0 api_keys, 0 contacts,
+  0 communications) — a vestige.
+- **Clever Orchid** never created a properly-named source. The
+  install-generated key stayed attached to ``bootstrap``, and every
+  contact / communication / spam event on that VPS was attributed
+  to it. ``bootstrap`` was effectively the consumer site.
+
+Two artifacts close the gap:
+
+- ``migrations/029_drop_orphaned_bootstrap_source.sql`` — DELETEs
+  ``bootstrap`` rows that have **no inbound FK reference at all**
+  (api_keys, contacts, communications, spam_events, spam_rate_log).
+  Idempotent and fleet-safe — a CO-shaped install is left untouched
+  because its ``bootstrap`` row still has dependents; a CDC-shaped
+  install gets the orphan removed.
+- ``scripts/rename-bootstrap-source.sql`` — parameterized one-shot
+  template for renaming an *active* ``bootstrap`` row in place
+  (id stays the same so all FKs survive). The actual values used
+  for Clever Orchid live in
+  ``scripts/rename-bootstrap-clever-orchid.sql`` for audit. After
+  the rename, CO's source row is ``clever_orchid_website``
+  (``Clever Orchid Website``, ``website``,
+  ``cleverorchid.com``).
+
+Why no automatic rename in migration 029: the new code / name /
+domain are per-install values. A migration that hardcoded "if
+bootstrap is the only source, rename it to X" would mis-fire on
+any future VPS where X isn't the right name.
+
+Going forward, ``scripts/install.sh`` should be updated to create
+the properly-named source from day one (operator supplies code,
+name, domain via flags) so the rename script is only needed for
+the historical fix on existing instances. Filed in TODO.
+
+
 
 Two small follow-ups to v0.3.0, shipped as a patch release:
 

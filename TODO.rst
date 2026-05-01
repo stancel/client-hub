@@ -435,14 +435,29 @@ was therefore a no-op on CO. This is an installation gap, not data
 loss, but it muddies attribution (every CO contact has
 ``first_seen_source_id = bootstrap``).
 
-- [ ] Create a dedicated ``clever_orchid_website`` source on CO
-  (POST /api/v1/admin/sources with the proper code, name, type,
-  domain) and a per-source API key
-- [ ] Issue KT prompt to the Clever Orchid Next.js site to rotate
-  ``CLIENTHUB_API_KEY`` to the new per-source key, then redeploy
-- [ ] After the consumer-site rotation, deprecate (delete) any
-  remaining ``bootstrap``-key rows that aren't the install-time
-  root operator key
+.. _client-hub-todo-phase16-v0-3-2:
+
+Phase 16 — v0.3.2 follow-ups [COMPLETE]
+----------------------------------------------------------------------
+
+- [x] Migration 029 — DELETE orphan ``bootstrap`` source rows
+  (no api_keys, no contacts, no communications, no spam_events, no
+  spam_rate_log references). Idempotent + fleet-safe
+- [x] ``scripts/rename-bootstrap-source.sql`` — parameterized
+  template for renaming an active ``bootstrap`` row in place
+- [x] ``scripts/rename-bootstrap-clever-orchid.sql`` — committed
+  CO-specific values for audit
+- [ ] Deploy v0.3.2 to CDC: drops orphan bootstrap (no rename needed
+  — CDC already has ``complete_dental_care_website``)
+- [ ] Deploy v0.3.2 to Clever Orchid: rename bootstrap →
+  ``clever_orchid_website`` via committed SQL
+
+**Source-discipline going forward:**
+
+- [ ] Update ``scripts/install.sh`` to create a properly-named
+  source from day one (operator-supplied code, name, domain via
+  flags) so future installs never produce an unnamed
+  ``bootstrap``-only state
 - [ ] Document the "every consumer integration must have its own
   named source + key, never the bootstrap key" rule in
   ``docs/Spam-Defense-Pattern.rst`` (or a new ``Sources.rst``) so
