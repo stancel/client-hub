@@ -480,9 +480,12 @@ Phase 16 — v0.3.3 follow-ups [COMPLETE]
 - [x] ``scripts/seed-business-settings-cdc.sql`` +
   ``scripts/seed-business-settings-clever-orchid.sql`` — committed
   per-VPS values for the retroactive seed on pre-v0.3.3 instances
-- [ ] Deploy v0.3.3 to CDC: run business_settings seed script
-- [ ] Deploy v0.3.3 to Clever Orchid: run business_settings seed
-  script
+- [x] Deploy v0.3.3 to CDC: business_settings seeded (Complete
+  Dental Care / dental / America/New_York / USD / US /
+  https://completedentalcarecolumbia.com)
+- [x] Deploy v0.3.3 to Clever Orchid: business_settings seeded
+  (Clever Orchid / embroidery / America/New_York / USD / US /
+  https://cleverorchid.com)
 
 .. _client-hub-todo-future:
 
