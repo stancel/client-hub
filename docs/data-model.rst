@@ -135,8 +135,21 @@ Table Definitions
 business_settings
 ======================================================================
 
-Singleton table holding configuration for the business that owns this
-database instance.
+Singleton table holding configuration for the **business that owns
+this database instance**. Each Client Hub instance is single-tenant
+by design (one database per business) and this row is the canonical
+record of *which* business — used for invoice headers, email
+signatures, audit logs, support escalation, and the future
+fleet-readiness control plane that wants to show
+"X businesses on Y versions."
+
+The row should be populated **at install time** by
+``scripts/install.sh``, which prompts for the business name, type,
+timezone, currency, default tax rate, contact phone/email/website,
+and physical address (or accepts them via ``--business-*`` flags
+in non-interactive mode). An empty ``business_settings`` table on a
+running install is a deployment defect — see Phase 16 in
+``TODO.rst``.
 
 .. list-table::
    :header-rows: 1
@@ -224,6 +237,199 @@ directly to the business (no separate address entity needed for a
 singleton). ``settings_json`` provides extensibility without schema
 changes for business-specific config.
 
+.. _client-hub-dm-sources:
+
+sources
+======================================================================
+
+**Purpose.** Records every authenticated *integration* that is allowed
+to push data into Client Hub or read from it on behalf of an external
+system. A "source" is the identity of the system holding an API key —
+the consumer Next.js website, the InvoiceNinja webhook caller, the
+Chatwoot widget, a future SIP/CTI agent, an MCP write tool — not a
+marketing channel. (Marketing channels are
+``marketing_sources``; the two tables answer different questions and
+should not be confused.)
+
+Every authenticated write attaches a ``source_id`` to the data it
+creates, so the audit trail "where did this contact / communication /
+spam-rejection / rate-limit row come from?" is preserved at the row
+level. Reads do not require source attribution but use the same
+authentication mechanism (``api_keys`` FKs to ``sources.id``).
+
+Added in migration **014** alongside ``api_keys``. Migration **028**
+populates the ``domain`` column on existing rows. Migration **029**
+removes orphan ``bootstrap`` rows that pre-named installs leave
+behind.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 10 45
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - id
+     - BIGINT UNSIGNED AUTO_INCREMENT
+     - NO
+     - PK
+   * - uuid
+     - CHAR(36)
+     - NO
+     - UNIQUE, for external/API use
+   * - code
+     - VARCHAR(64)
+     - NO
+     - UNIQUE machine-readable key, e.g.
+       ``complete_dental_care_website``
+   * - name
+     - VARCHAR(255)
+     - NO
+     - Human display name, e.g. "Complete Dental Care Website"
+   * - source_type
+     - VARCHAR(32)
+     - NO
+     - One of ``website`` / ``webhook`` / ``mcp`` / ``other``;
+       default ``website``
+   * - domain
+     - VARCHAR(255)
+     - YES
+     - The integration's primary domain (e.g.
+       ``cleverorchid.com``). Used by the marketing-source
+       derivation to authoritatively classify same-domain
+       referrers as ``website`` instead of relying on a
+       hostname-pattern heuristic.
+   * - description
+     - TEXT
+     - YES
+     - Free-form notes (the seeded ``bootstrap`` row carries the
+       installer's "rename or create additional sources" guidance
+       here).
+   * - is_active
+     - BOOLEAN
+     - NO
+     - DEFAULT TRUE; deactivate to soft-disable an integration
+       without deleting the audit history it produced
+   * - created_at, updated_at
+     - DATETIME
+     -
+     - Standard
+
+**Indexes:**
+
+- UNIQUE on ``code``
+- UNIQUE on ``uuid``
+
+**FK targets (rows reference ``sources.id``):**
+
+- ``api_keys.source_id`` (every key belongs to exactly one source)
+- ``contacts.first_seen_source_id`` (which integration first
+  introduced this contact)
+- ``communications.source_id`` (which integration logged this
+  interaction)
+- ``spam_events.source_id`` (which integration triggered the
+  rejection)
+- ``spam_rate_log.source_id`` (per-source rate-limit scoping;
+  added migration 025)
+
+**Discipline rule.** Every consumer integration must have its own
+named ``sources`` row and at least one ``api_keys`` row attached to
+it. The seeded ``bootstrap`` row exists only to bootstrap an empty
+install — it should be renamed (one-tenant installs) or supplemented
+with properly-named rows (multi-source installs) and never used
+indefinitely as a runtime identity. See ``docs/Sources.rst`` for the
+full contract and the per-VPS rename helpers in ``scripts/``.
+
+.. _client-hub-dm-api-keys:
+
+api_keys
+======================================================================
+
+**Purpose.** Stores the API keys that authenticate inbound requests.
+Every key is tied to exactly one ``sources`` row, so resolving a key
+yields the source identity automatically. A single source can hold
+multiple keys (rotation, scoped subagents, per-deploy keys).
+
+Added in migration **014**.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 10 45
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - id
+     - BIGINT UNSIGNED AUTO_INCREMENT
+     - NO
+     - PK
+   * - uuid
+     - CHAR(36)
+     - NO
+     - UNIQUE, for external/API use
+   * - source_id
+     - BIGINT UNSIGNED
+     - NO
+     - FK → ``sources.id``
+   * - key_prefix
+     - VARCHAR(16)
+     - NO
+     - First few characters of the key for human-readable
+       identification in admin UIs without exposing the full
+       secret
+   * - key_value
+     - VARCHAR(128)
+     - NO
+     - UNIQUE — the full key as presented in the
+       ``X-API-Key`` header. Stored in plaintext today (the
+       value *is* the secret; clients hold the only other copy
+       in a ``.env``)
+   * - name
+     - VARCHAR(255)
+     - NO
+     - Human display name, e.g. "Install-generated key" or
+       "Read-only smoke-test key"
+   * - is_active
+     - BOOLEAN
+     - NO
+     - DEFAULT TRUE
+   * - created_at
+     - DATETIME
+     - NO
+     -
+   * - last_used_at
+     - DATETIME
+     - YES
+     - Stamped on every successful auth — useful for spotting
+       unused / abandoned keys before rotation
+   * - revoked_at
+     - DATETIME
+     - YES
+     - Soft revocation; set to NOW() to disable without losing
+       the audit trail of which key signed prior writes
+
+**Indexes:**
+
+- UNIQUE on ``uuid``
+- UNIQUE on ``key_value``
+- ``idx_ak_prefix`` on ``key_prefix`` (for admin lookup-by-prefix)
+- ``idx_ak_active`` on ``is_active``
+
+**Auth flow.** ``app.middleware.auth.require_api_key`` resolves the
+inbound ``X-API-Key`` header to an ``api_keys`` row, follows
+``source_id`` to the parent ``sources`` row, and stamps
+``ctx.source_id`` onto the request. Every write the request
+performs that touches a source-attributed table will carry that
+``source_id``.
+
+**Operational note.** Keys are rotated by issuing a new ``api_keys``
+row for the same source, deploying the new value to the consumer,
+and revoking the old row. The data already attributed under the old
+key remains attached because attribution is by ``source_id``, not
+``api_key_id``.
+
 .. _client-hub-dm-lookup-tables:
 
 Lookup Tables
@@ -274,24 +480,61 @@ Common structure:
 
 Tables using this structure:
 
-- **contact_types** — client, prospect, lead, vendor, other
-- **phone_types** — mobile, home, work, fax, other
-- **email_types** — personal, work, billing, other
-- **address_types** — home, work, billing, shipping, other
-- **channel_types** — sms, email, phone, chat, portal, in_person
-- **marketing_sources** — google_search, social_media_ad, referral,
-  walk_in, phone_call, website, word_of_mouth, other
-- **order_statuses** — quoted, confirmed, in_progress, completed,
-  cancelled, on_hold
-- **order_item_types** — product, service, booking, other
-- **invoice_statuses** — draft, sent, paid, partial, overdue, void
-- **payment_methods** — cash, credit_card, debit_card, check, bank_transfer,
-  online, other
-- **tags** — user-defined; no preset values
+- **contact_types** — ``client``, ``prospect``, ``lead``, ``vendor``,
+  ``other``. The runtime enrichment of a contact (the same person can
+  start as a ``lead``, become a ``prospect``, then become a ``client``
+  after their first paid order — see ``contacts.converted_at`` /
+  ``converted_from_type_id`` for the conversion audit).
+- **phone_types** — ``mobile``, ``home``, ``work``, ``fax``,
+  ``other``. Annotates the *role* of a phone number (a contact may
+  have multiple).
+- **email_types** — ``personal``, ``work``, ``billing``, ``other``.
+- **address_types** — ``home``, ``work``, ``billing``, ``shipping``,
+  ``other``. Annotates the role of a postal address.
+- **channel_types** — ``web_form``, ``booking_completed``, ``sms``,
+  ``email``, ``phone``, ``chat``, ``portal``, ``in_person``,
+  ``call_inbound``, ``call_outbound``. Set via migration 011 + 016
+  (cross-project channel-type extension). Used by ``communications``
+  and ``contact_channel_prefs``.
+- **marketing_sources** — ``google_search``, ``social_media_ad``,
+  ``social_media_organic``, ``referral``, ``walk_in``, ``phone_call``,
+  ``website``, ``word_of_mouth``, ``repeat``, ``other``. Marketing
+  attribution channels — *how the contact found the business*. Per
+  v0.3.0, ``app.services.marketing_source_service.derive_codes`` maps
+  UTM parameters and referrer hostname to one or more of these codes
+  when the consumer site doesn't supply an explicit list. Read-only
+  via the source-key-gated ``GET /api/v1/marketing-sources`` endpoint
+  (mirrors the ``/spam-patterns`` pattern).
+- **order_statuses** — ``quoted``, ``confirmed``, ``in_progress``,
+  ``completed``, ``cancelled``, ``on_hold``. Order lifecycle states
+  (transitions tracked in ``order_status_history``).
+- **order_item_types** — ``product``, ``service``, ``booking``,
+  ``other``. The shape of an order line (a haircut booking and a
+  bottle of shampoo are both ``order_items`` but billed differently).
+- **invoice_statuses** — ``draft``, ``sent``, ``paid``, ``partial``,
+  ``overdue``, ``void``. Invoice-level state, distinct from
+  ``order_statuses`` because an order can produce multiple invoices
+  (deposit + final).
+- **payment_methods** — ``cash``, ``credit_card``, ``debit_card``,
+  ``check``, ``bank_transfer``, ``online``, ``other``.
+- **seniority_levels** — ``ic``, ``manager``, ``director``, ``vp``,
+  ``c_suite``, ``owner``, ``other``. Used by
+  ``contact_org_affiliations.seniority_level_id`` to capture
+  decision-maker seniority for B2B-style contacts. Added migration
+  019.
+- **tags** — user-defined; no seeded preset values. Free-form labels
+  applied via ``contact_tag_map``.
 
 **Normalization:** Each lookup table is in 3NF. ``code`` and ``label``
 are independent attributes of the lookup entry — ``label`` does not
 depend on ``code`` (different businesses may relabel the same code).
+
+**Why these are lookups and ``sources`` is not.** ``sources``
+carries a UUID, a typed integration kind, a domain, and richer
+attributes (it's the runtime identity of an integration). Lookup
+tables here are pure controlled-vocabulary references and share the
+same minimal shape via the ``LookupMixin`` SQLAlchemy mixin. The
+``sources`` table is documented separately above.
 
 .. _client-hub-dm-contacts:
 
@@ -322,6 +565,15 @@ type (client, prospect, lead, vendor) is determined by
      - BIGINT UNSIGNED
      - NO
      - FK → contact_types.id
+   * - first_seen_source_id
+     - BIGINT UNSIGNED
+     - NO
+     - FK → ``sources.id``. Auto-stamped on contact create from
+       the authenticated request's source. Records *which
+       integration first introduced this contact* and is never
+       overwritten on subsequent updates — even if the contact
+       is later edited via a different integration. Added
+       migration 015.
    * - first_name
      - VARCHAR(100)
      - NO
@@ -720,7 +972,15 @@ Multiple phone numbers per contact with type labels and provenance.
    * - phone_number
      - VARCHAR(20)
      - NO
-     - E.164 format preferred
+     - **E.164 format required** (``+15558675309``). Enforced at
+       two layers: a Pydantic validator on
+       ``ContactCreatePhone.number`` calls
+       ``app.services.phone_utils.normalize_to_e164`` to coerce
+       any common input format (raw 10-digit, hyphenated,
+       parenthesized, ``1``-prefixed, already-E.164) to canonical
+       form before storage; and a DB-level CHECK constraint
+       ``chk_cp_phone_e164`` (``^\+[0-9]{10,15}$``) catches
+       anything that bypasses the API. Added in migration 027.
    * - phone_extension
      - VARCHAR(10)
      - YES
@@ -998,7 +1258,10 @@ but references ``organization_id``.
    * - phone_number
      - VARCHAR(20)
      - NO
-     -
+     - **E.164 format required**, same contract as
+       ``contact_phones.phone_number``. DB-level CHECK constraint
+       ``chk_op_phone_e164`` (``^\+[0-9]{10,15}$``) added in
+       migration 027.
    * - phone_extension
      - VARCHAR(10)
      - YES
@@ -1202,9 +1465,28 @@ this specific preference record, not of the contact or channel.
 contact_marketing_sources (junction)
 ======================================================================
 
-Many-to-many: how a contact found the business. A contact may have
-arrived through multiple channels (e.g., saw a social media ad AND
-got a referral).
+Many-to-many: **how a contact found the business**. A contact may
+have arrived through multiple channels (e.g., saw a social media
+ad AND got a referral). Distinct from ``sources`` which records the
+*integration* that wrote the row — this junction is the marketing
+channel attribution dimension.
+
+**Two attribution paths** (v0.3.0+):
+
+1. **Explicit** — the consumer site sends ``marketing_sources: ["..."]``
+   in the ``POST /api/v1/contacts`` body. Junction rows get
+   ``source_detail = 'explicit'``. Always wins when present.
+2. **Derived** — when the explicit list is empty,
+   ``app.services.marketing_source_service.derive_codes`` runs
+   against ``external_refs_json`` (UTM params first, then referrer
+   hostname) and writes one or more rows with
+   ``source_detail = 'derived'``. Conservative defaulting to the
+   ``website`` code when no signal is present.
+
+Backfilled rows on existing instances carry
+``source_detail = 'derived-backfill'`` so retroactive attribution
+(via ``scripts/backfill-marketing-sources.sql``) is distinguishable
+in analytics from in-flight derivation.
 
 .. list-table::
    :header-rows: 1
@@ -1422,6 +1704,36 @@ no affiliations at all, or all affiliations with
 ``is_primary=FALSE``) see NULL in the organization columns.
 ``role_title`` and ``department`` from the primary affiliation are
 now also surfaced on the view for integration convenience.
+
+.. _client-hub-dm-view-events:
+
+v_events_by_source
+======================================================================
+
+**Purpose.** Cross-source event stream — one row per
+``communications`` record, joined to its parent ``sources``,
+``channel_types``, and ``contacts`` rows. Used by the
+``GET /api/v1/admin/events`` endpoint to render a unified timeline
+of "everything that came in across all integrations."
+
+Each row exposes:
+
+- ``communication_id`` / ``communication_uuid`` — the underlying
+  communications row
+- ``source_code`` / ``source_name`` / ``source_type`` /
+  ``source_domain`` — denormalized source identity
+- ``channel_code`` / ``channel_label`` — the surface (web_form,
+  booking_completed, sms, chat, etc.)
+- ``direction`` (inbound/outbound), ``occurred_at``, ``subject``,
+  ``body``, ``external_message_id``
+- ``contact_id`` / ``contact_uuid`` / ``first_name`` / ``last_name``
+- ``external_refs_json`` from the contact (carries the consumer
+  site's IP, user-agent, referrer, UTM params, form-name, etc.)
+- ``created_at`` / ``created_by``
+
+Filterable in the API by ``source_code``, ``channel_code``,
+``direction``, and ``occurred_at`` window. Added in migration
+**017**.
 
 .. _client-hub-dm-orders:
 
@@ -1817,7 +2129,10 @@ Payment records against an invoice.
 communications
 ======================================================================
 
-Log of all interactions with a contact across all channels.
+Log of all interactions with a contact across all channels — every
+inbound contact-form submission, booking confirmation, SMS, chat
+message, support ticket reply, scheduled phone call, etc. The
+single canonical timeline of "what happened with this contact."
 
 .. list-table::
    :header-rows: 1
@@ -1835,6 +2150,12 @@ Log of all interactions with a contact across all channels.
      - CHAR(36)
      - NO
      - UNIQUE
+   * - source_id
+     - BIGINT UNSIGNED
+     - NO
+     - FK → ``sources.id``. Auto-stamped from the authenticated
+       request (``ctx.source_id``). Records which integration
+       logged this communication. Added migration 015.
    * - contact_id
      - BIGINT UNSIGNED
      - NO
@@ -1842,7 +2163,11 @@ Log of all interactions with a contact across all channels.
    * - channel_type_id
      - BIGINT UNSIGNED
      - NO
-     - FK → channel_types.id
+     - FK → channel_types.id. Distinguishes the *surface* the
+       message came through (web_form vs booking_completed vs
+       sms vs chat etc.) — orthogonal to ``source_id`` (which
+       integration), so a single Next.js site can log into many
+       channels.
    * - order_id
      - BIGINT UNSIGNED
      - YES
@@ -1884,6 +2209,334 @@ Log of all interactions with a contact across all channels.
 - ``idx_comm_order`` on ``order_id``
 - ``idx_comm_occurred`` on ``occurred_at``
 - ``idx_comm_external`` on ``external_message_id``
+- ``idx_comm_source`` on ``source_id`` (added migration 015)
+
+.. _client-hub-dm-spam-tables:
+
+**********************************************************************
+Spam-Defense Tables
+**********************************************************************
+
+Three tables comprise the API-level spam-defense framework. Every
+public-ish endpoint inherits a one-line guard via
+``app.services.spam_filter_service.spam_check_or_raise`` which reads
+``spam_patterns``, writes ``spam_events`` on rejection, and writes
+``spam_rate_log`` on every clean submission to power the
+sliding-window rate-limit. Operational data lives in DB tables (not
+files) by design — see the design memo for the rationale around
+analytics and future ETL to OLAP.
+
+See ``docs/Spam-Defense-Pattern.rst`` for the full design contract.
+
+.. _client-hub-dm-spam-patterns:
+
+spam_patterns
+======================================================================
+
+**Purpose.** Operator-managed pattern library that the spam filter
+loads on every request. Patterns are categorized by ``pattern_kind``
+and matched against incoming payloads in deterministic order
+(phone country block → email substring/full block → URL regex →
+phrase regex with ≥ 2 matches required → rate-limit). Per-pattern
+hit counts and false-positive counts give built-in analytics.
+
+DB-driven by design so operators can add / remove patterns without
+a code deploy. Consumer sites pull the canonical list via the
+source-key-gated ``GET /api/v1/spam-patterns`` endpoint and apply
+the same patterns at the form layer (defense in depth).
+
+Added in migration **023**. Migration **024** added 18 B2B-pitch
+patterns after the Hoff & Mazor cold-pitch slipped through.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 10 35
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - id
+     - BIGINT UNSIGNED AUTO_INCREMENT
+     - NO
+     - PK
+   * - uuid
+     - CHAR(36)
+     - NO
+     - UNIQUE
+   * - pattern_kind
+     - ENUM
+     - NO
+     - One of ``email_substring``, ``full_email_block``,
+       ``url_regex``, ``phrase_regex``, ``phone_country_block``
+   * - pattern
+     - VARCHAR(500)
+     - NO
+     - The substring or regex (interpreted per ``pattern_kind``)
+   * - notes
+     - VARCHAR(500)
+     - YES
+     - Operator commentary explaining the pattern's origin
+   * - is_active
+     - BOOLEAN
+     - NO
+     - DEFAULT TRUE; soft-disable rather than delete to preserve
+       the analytics history a pattern accumulated
+   * - hit_count
+     - INT UNSIGNED
+     - NO
+     - DEFAULT 0; bumped on each rejection caused by this pattern
+   * - last_hit_at
+     - DATETIME
+     - YES
+     - When the pattern most recently matched
+   * - false_positive_count
+     - INT UNSIGNED
+     - NO
+     - DEFAULT 0; bumped via
+       ``POST /api/v1/admin/spam-events/{uuid}/mark-false-positive``
+   * - created_at, updated_at
+     - DATETIME
+     -
+     - Standard
+   * - created_by
+     - VARCHAR(100)
+     - YES
+     - e.g. ``migration_023`` for seeded rows or an operator name
+
+**Indexes:**
+
+- UNIQUE on ``uuid``
+- ``idx_sp_active_kind`` on ``(is_active, pattern_kind)`` —
+  fast pattern loading by kind for the active-only filter
+
+.. _client-hub-dm-spam-events:
+
+spam_events
+======================================================================
+
+**Purpose.** One row per spam rejection — the full audit trail of
+every submission the API rejected, plus (since v0.3.0)
+``rejection_reason='soft_signal'`` rows for *clean* submissions that
+grazed exactly one phrase pattern (below the rejection threshold) so
+operators can review near-misses without rejecting.
+
+The denormalized ``matched_pattern_text`` survives later deletion of
+the pattern row, so the audit log is intact even as the pattern
+library evolves.
+
+Added in migration **023**. Migration **025** added the
+``user_agent`` column for forensics.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 10 35
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - id, uuid
+     -
+     -
+     - Standard PK + UUID
+   * - source_id
+     - BIGINT UNSIGNED
+     - YES
+     - FK → ``sources.id`` ON DELETE SET NULL. Which integration
+       triggered the rejection.
+   * - endpoint
+     - VARCHAR(100)
+     - NO
+     - e.g. ``/api/v1/contacts``,
+       ``/api/v1/webhooks/chatwoot``
+   * - integration_kind
+     - ENUM
+     - NO
+     - ``web_form`` / ``webhook`` / ``mcp`` / ``direct_api`` /
+       ``other`` — the *category* of caller surface. Default
+       ``other``.
+   * - remote_ip
+     - VARCHAR(45)
+     - YES
+     - The real client IP per the v0.2.0 IP-capture contract
+       (payload-supplied for source-key endpoints, X-Forwarded-For
+       via uvicorn ``--proxy-headers`` otherwise). IPv6-compatible
+       width.
+   * - user_agent
+     - VARCHAR(255)
+     - YES
+     - User-agent string from the same precedence (payload
+       > request header). Added migration 025.
+   * - submitted_email,
+       submitted_phone,
+       submitted_body_hash
+     - VARCHAR / CHAR(16)
+     - YES
+     - The submitted values that triggered the match. Body is
+       hashed (SHA-256, first 16 hex chars) rather than stored
+       verbatim — recoverable from ``payload_json`` if needed but
+       not searchable as plaintext.
+   * - matched_pattern_id
+     - BIGINT UNSIGNED
+     - YES
+     - FK → ``spam_patterns.id`` ON DELETE SET NULL.
+       NULL for rate-limit / phone-invalid / soft-signal events.
+   * - matched_pattern_text
+     - VARCHAR(500)
+     - YES
+     - Denormalized copy of the matched pattern at rejection
+       time — survives later pattern deletion.
+   * - rejection_reason
+     - VARCHAR(64)
+     - NO
+     - One of ``email_blocked``, ``url_blocked``,
+       ``phrase_combo``, ``phone_invalid``, ``rate_limit``, or
+       ``soft_signal`` (clean payload that grazed one phrase
+       pattern; v0.3.0+).
+   * - payload_json
+     - JSON
+     - YES
+     - Redacted submission payload for forensic review.
+   * - was_false_positive
+     - BOOLEAN
+     - NO
+     - DEFAULT FALSE. Operator marks via the admin endpoint;
+       bumps the matched pattern's ``false_positive_count``.
+   * - occurred_at
+     - DATETIME
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP
+
+**Indexes:**
+
+- UNIQUE on ``uuid``
+- ``idx_se_occurred`` on ``occurred_at``
+- ``idx_se_source`` on ``(source_id, occurred_at)``
+- ``idx_se_endpoint`` on ``(endpoint, occurred_at)``
+- ``idx_se_email`` on ``submitted_email``
+- ``idx_se_pattern`` on ``matched_pattern_id``
+
+.. _client-hub-dm-spam-rate-log:
+
+spam_rate_log
+======================================================================
+
+**Purpose.** Sliding-window rate-limit state. Every clean submission
+records up to three rows here — keyed by email, by email+body_hash,
+and by IP — and the next submission's rate-limit check counts how
+many prior rows match within the window. Per-key thresholds in
+``RATE_LIMIT_THRESHOLDS`` (``email=1``, ``email_body_hash=1``,
+``ip=5``) decide when the next submission is rejected with
+``rejection_reason='rate_limit'``.
+
+Multi-worker safe via the DB itself — no Redis dependency, no
+in-process coordination needed. Pruned opportunistically: every
+write deletes rows older than 1 hour to keep the table bounded.
+
+Added in migration **023**. Migration **025** added ``source_id``
+and ``user_agent``. Migration **026** bumped ``occurred_at`` to
+``DATETIME(6)`` so same-second submissions from the same IP don't
+collide on the composite PK.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 10 35
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - key_type
+     - ENUM
+     - NO
+     - ``email`` / ``email_body_hash`` / ``ip``. Part of PK.
+   * - key_value
+     - VARCHAR(255)
+     - NO
+     - The actual key (an email, an ``email|body_hash`` string,
+       or an IPv4/IPv6 address). Part of PK.
+   * - source_id
+     - BIGINT UNSIGNED
+     - YES
+     - FK → ``sources.id``. For per-source rate-limit scoping
+       (planned). Added migration 025.
+   * - user_agent
+     - VARCHAR(255)
+     - YES
+     - For forensics. Added migration 025.
+   * - occurred_at
+     - DATETIME(6)
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP(6) — microsecond precision so
+       bursts within a single wall-clock second don't lose rows
+       to PK collision under INSERT IGNORE. Part of PK.
+
+**Indexes:**
+
+- PRIMARY KEY on ``(key_type, key_value, occurred_at)``
+- ``idx_srl_prune`` on ``occurred_at`` (for the opportunistic
+  prune query)
+- ``idx_srl_source`` on ``(source_id, occurred_at)`` (added
+  migration 025)
+
+**Why no ORM model.** The hot-path rate-limit check needs raw SQL
+performance and the table has no rich relationships beyond a
+``source_id`` FK; the Python ORM overhead would slow every
+public-endpoint write for no benefit. See the comment at the bottom
+of ``api/app/models/spam.py``.
+
+.. _client-hub-dm-schema-migrations:
+
+**********************************************************************
+System / Operational Tables
+**********************************************************************
+
+.. _client-hub-dm-schema-migrations-table:
+
+_schema_migrations
+======================================================================
+
+**Purpose.** Migration runner state. ``scripts/bootstrap-migrations.sh``
+inserts a row here for each successfully-applied migration file and
+skips files whose ``version`` already appears. The leading
+underscore in the table name marks it as infrastructure (not part
+of the business data model) and keeps it out of the way in
+alphabetical listings.
+
+Added in migration **018**. ``scripts/backfill-schema-tracker.sh``
+exists for installs that pre-date this table — it records every
+pre-018 migration as already-applied so the runner doesn't try to
+re-apply them.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 25 10 35
+
+   * - Column
+     - Type
+     - Nullable
+     - Notes
+   * - version
+     - VARCHAR(255)
+     - NO
+     - PK. The migration filename, e.g.
+       ``027_phone_e164_normalization.sql``.
+   * - applied_at
+     - DATETIME
+     - NO
+     - DEFAULT CURRENT_TIMESTAMP. When the runner applied the
+       file. Useful for "what changed in the last hour" queries
+       during a multi-step rollout.
+
+**Indexes:**
+
+- PRIMARY KEY on ``version``
+
+**Operational note.** This table is the source of truth for
+"what migrations has this VPS applied?" — a future fleet-readiness
+control plane (Phase 15 in ``TODO.rst``) will query it across
+instances to surface drift.
 
 .. _client-hub-dm-junction-summary:
 
@@ -1981,12 +2634,14 @@ Complete Table List
 
 1. business_settings
 2. contacts (multi-org via ``contact_org_affiliations``; no direct
-   ``organization_id`` FK as of migration 021)
+   ``organization_id`` FK as of migration 021;
+   ``first_seen_source_id`` since migration 015)
 3. organizations
-4. contact_phones (with nullable ``affiliation_id`` as of 020)
+4. contact_phones (E.164-enforced via Pydantic + DB CHECK as of
+   migration 027; nullable ``affiliation_id`` as of 020)
 5. contact_emails (with nullable ``affiliation_id`` as of 020)
 6. contact_addresses (with nullable ``affiliation_id`` as of 020)
-7. org_phones
+7. org_phones (E.164-enforced via DB CHECK as of migration 027)
 8. org_emails
 9. org_addresses
 10. contact_channel_prefs
@@ -1997,52 +2652,74 @@ Complete Table List
 15. order_status_history
 16. invoices
 17. payments
-18. communications
+18. communications (``source_id`` since migration 015)
 19. api_keys (multi-source API keys, added migration 014)
+
+**Identity / auth tables (1):**
+
+20. sources (every authenticated integration; ``domain`` populated
+    via migration 028; orphan ``bootstrap`` rows dropped via
+    migration 029)
 
 **Junction tables (3):**
 
-20. contact_tag_map
-21. contact_marketing_sources
-22. contact_org_affiliations (added migration 019, replaces the
+21. contact_tag_map
+22. contact_marketing_sources (carries
+    ``source_detail in ('explicit','derived','derived-backfill')``
+    since v0.3.0)
+23. contact_org_affiliations (added migration 019, replaces the
     dropped ``contacts.organization_id`` FK)
 
-**Lookup tables (13):**
+**Lookup tables (12):**
 
-23. contact_types
-24. phone_types
-25. email_types
-26. address_types
-27. channel_types
-28. marketing_sources
-29. order_statuses
-30. order_item_types
-31. invoice_statuses
-32. payment_methods
-33. tags
-34. sources (multi-source tracking, added migration 014)
+24. contact_types
+25. phone_types
+26. email_types
+27. address_types
+28. channel_types (extended in migration 016 with the
+    cross-project channel codes)
+29. marketing_sources (canonical list pulled by consumer sites
+    via ``GET /api/v1/marketing-sources``; v0.3.0)
+30. order_statuses
+31. order_item_types
+32. invoice_statuses
+33. payment_methods
+34. tags
 35. seniority_levels (added migration 019)
+
+**Spam-defense tables (3):**
+
+36. spam_patterns (operator-managed pattern library; migration
+    023, expanded in 024)
+37. spam_events (rejection audit log + soft-signal review queue;
+    ``user_agent`` since migration 025)
+38. spam_rate_log (sliding-window rate-limit state; ``source_id``
+    + ``user_agent`` since migration 025; ``DATETIME(6)``
+    precision since migration 026)
 
 **System tables (1):**
 
-36. ``_schema_migrations`` — migration tracking (added migration 018)
+39. ``_schema_migrations`` — migration tracking (added migration
+    018)
 
 **Views (3):**
 
-37. v_contact_last_order — last order details per contact
-38. v_contact_summary — holistic intelligence view (rewritten in
+40. v_contact_last_order — last order details per contact
+41. v_contact_summary — holistic intelligence view (rewritten in
     migration 021 to source organization info from the
     ``is_primary=1`` affiliation row)
-39. v_events_by_source — cross-source event stream joining
+42. v_events_by_source — cross-source event stream joining
     contacts, communications, sources (added migration 017)
 
-**Total: 36 tables + 3 views (as of migration 022).**
+**Total: 39 tables + 3 views (as of migration 029).**
 
 .. note::
 
    This section was significantly out of date prior to migrations
-   019-022 — it still listed counts from migration 013 and omitted
-   the multi-source (014), channel_types extension (016),
+   019-022 — it listed counts from migration 013 and omitted the
+   multi-source (014), channel_types extension (016),
    v_events_by_source (017), and _schema_migrations (018)
-   additions. Brought fully in sync as part of the multi-org
-   refactor documentation pass.
+   additions. Brought fully in sync first during the multi-org
+   refactor documentation pass and again during the v0.3.x
+   release (phone E.164, marketing-source attribution, spam
+   audit columns, sources.domain, bootstrap cleanup).

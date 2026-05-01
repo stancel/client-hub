@@ -4,10 +4,86 @@
 Client Hub — Changelog
 ######################################################################
 
-.. _client-hub-changelog-v0-3-2:
+.. _client-hub-changelog-v0-3-3:
 
-v0.3.2 — 2026-05-01 — Sources cleanup: drop orphan bootstrap, rename CO
-=======================================================================
+v0.3.3 — 2026-05-01 — Source discipline + business_settings + data-model docs
+=============================================================================
+
+Closes the remaining Phase 16 follow-ups so future installs can never
+reproduce the gaps that v0.3.1 / v0.3.2 fixed by hand on the existing
+VPSes.
+
+**Source discipline encoded in the installer.**
+``scripts/install.sh`` now rejects ``--first-source-code=bootstrap``
+and requires a per-business slug — an install that doesn't supply
+one fails with a pointed error pointing at ``docs/Sources.rst``. New
+flags ``--first-source-domain`` and ``--first-source-type`` plumb
+the consumer-site domain and integration kind into the source row
+at create time so the marketing-source derivation can use them
+authoritatively. The install-generated API key is attached to the
+named source, never to ``bootstrap`` — so future installs produce
+the CDC-shaped state, not the CO-shaped state.
+
+**business_settings populated at install time.**
+``scripts/install.sh`` gained ``--business-name`` (required) plus
+``--business-type``, ``--business-timezone``, ``--business-currency``,
+``--business-country``, ``--business-phone``, ``--business-email``,
+and ``--business-website``. The interactive prompts collect the same
+values; non-interactive installs supply them via flags. The
+singleton row is INSERTed via a Python-built parameterized SQL
+literal so values containing quotes or specials are escaped
+correctly. An empty ``business_settings`` table on a running install
+is now treated as a deployment defect — pre-v0.3.3 instances are
+seeded retroactively (see below).
+
+**Per-VPS business_settings seed scripts.**
+``scripts/seed-business-settings-cdc.sql`` and
+``scripts/seed-business-settings-clever-orchid.sql`` carry the
+actual production values (business name, type, timezone, currency,
+country, website) committed for audit. Both INSERTs are guarded by
+``WHERE NOT EXISTS (SELECT 1 FROM business_settings)`` so re-runs
+are no-ops once the row is in place.
+
+**``docs/data-model.rst`` brought fully current.** Six previously
+undocumented tables and one view now have first-class purpose +
+column documentation:
+
+- ``sources`` — promoted from "lookup" classification to its own
+  identity / auth section. Full column detail; FK targets listed;
+  the discipline rule referenced.
+- ``api_keys`` — auth flow, rotation pattern, ``key_prefix`` /
+  ``key_value`` / ``revoked_at`` semantics.
+- ``spam_patterns`` / ``spam_events`` / ``spam_rate_log`` — full
+  spam-defense triad documented with column-level detail, the
+  ``rejection_reason='soft_signal'`` v0.3.0 addition, the
+  ``user_agent`` column from migration 025, and the
+  ``DATETIME(6)`` precision change from migration 026.
+- ``v_events_by_source`` — cross-source event-stream view used by
+  ``GET /api/v1/admin/events``.
+- ``_schema_migrations`` — migration runner state; explicitly
+  flagged as the source of truth for fleet-readiness drift queries.
+
+Existing sections updated for drift: ``contacts.first_seen_source_id``
+(migration 015), ``communications.source_id`` (migration 015),
+``contact_phones`` / ``org_phones`` E.164 contract (migration 027),
+``contact_marketing_sources.source_detail`` semantics (v0.3.0), the
+lookup-tables list (added ``social_media_organic`` / ``repeat`` /
+``seniority_levels``; removed ``sources`` from the lookup
+classification). Total at the bottom is now accurately **39 tables
++ 3 views (as of migration 029).**
+
+**``docs/Sources.rst`` (new).** First-class document for the
+sources / api_keys contract: the discipline rule and why it
+matters (auditability, per-integration scoping, key rotation,
+offboarding, fleet readiness), the bootstrap row's intended
+lifecycle (rename or supplement, never run on), what the v0.3.3
+installer enforces, the rotation procedure, and the multi-source
+example pattern.
+
+**Test suite:** 180 tests, all green; ruff + rstcheck clean. SDKs
+regenerated at 0.3.3.
+
+
 
 The ``sources`` table's seeded ``bootstrap`` row carries the
 description "Initial source created by the installer. Rename or

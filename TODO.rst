@@ -454,16 +454,35 @@ Phase 16 — v0.3.2 follow-ups [COMPLETE]
   contacts and api_keys still resolve through the same FK); CO
   migration 029 was correctly a no-op because the row had dependents
 
-**Source-discipline going forward:**
+.. _client-hub-todo-phase16-v0-3-3:
 
-- [ ] Update ``scripts/install.sh`` to create a properly-named
-  source from day one (operator-supplied code, name, domain via
-  flags) so future installs never produce an unnamed
-  ``bootstrap``-only state
-- [ ] Document the "every consumer integration must have its own
-  named source + key, never the bootstrap key" rule in
-  ``docs/Spam-Defense-Pattern.rst`` (or a new ``Sources.rst``) so
-  future installs don't repeat this gap
+Phase 16 — v0.3.3 follow-ups [COMPLETE]
+----------------------------------------------------------------------
+
+- [x] ``scripts/install.sh`` now rejects ``bootstrap`` as the first
+  source code and requires ``--first-source-code`` /
+  ``--first-source-name`` / ``--first-source-domain`` /
+  ``--first-source-type``. Future installs cannot reproduce the
+  CO-shaped "bootstrap-as-runtime-identity" state.
+- [x] ``scripts/install.sh`` now collects + INSERTs into
+  ``business_settings`` (``--business-name`` required;
+  type/timezone/currency/country/phone/email/website optional).
+  Empty ``business_settings`` is now a deployment defect.
+- [x] ``docs/Sources.rst`` (new) — discipline rule, bootstrap
+  lifecycle, installer enforcement, key rotation, multi-source
+  example. ``docs/data-model.rst`` references it from the
+  ``sources`` section.
+- [x] ``docs/data-model.rst`` brought fully current — sources,
+  api_keys, spam_patterns, spam_events, spam_rate_log,
+  v_events_by_source, _schema_migrations now first-class. Drift in
+  contacts / communications / phone tables / marketing-source
+  junction repaired.
+- [x] ``scripts/seed-business-settings-cdc.sql`` +
+  ``scripts/seed-business-settings-clever-orchid.sql`` — committed
+  per-VPS values for the retroactive seed on pre-v0.3.3 instances
+- [ ] Deploy v0.3.3 to CDC: run business_settings seed script
+- [ ] Deploy v0.3.3 to Clever Orchid: run business_settings seed
+  script
 
 .. _client-hub-todo-future:
 

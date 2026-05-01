@@ -9,10 +9,22 @@
 #     --mode bundled \
 #     --domain client-hub.example.com \
 #     --admin-email admin@example.com \
-#     --first-source-code my_website \
-#     --first-source-name "My Website" \
+#     --first-source-code my_business_website \
+#     --first-source-name "My Business Website" \
+#     --first-source-domain mybusiness.com \
+#     --business-name "My Business, LLC" \
+#     --business-type embroidery \
+#     --business-timezone America/New_York \
+#     --business-email contact@mybusiness.com \
 #     --sdks typescript \
 #     --non-interactive
+#
+# Source-discipline rule: every install MUST create a properly-named
+# consumer-site source on day one. The seeded ``bootstrap`` row is for
+# the very first request that sets up the system — it should be
+# renamed (one-tenant case) or supplemented with named sources
+# (multi-source case) and never used as a runtime identity. See
+# docs/Sources.rst.
 
 set -euo pipefail
 
@@ -24,8 +36,21 @@ REPO_URL="https://github.com/stancel/client-hub"
 MODE="bundled"
 DOMAIN=""
 ADMIN_EMAIL=""
-FIRST_SOURCE_CODE="bootstrap"
-FIRST_SOURCE_NAME="Bootstrap Source"
+FIRST_SOURCE_CODE=""
+FIRST_SOURCE_NAME=""
+FIRST_SOURCE_DOMAIN=""
+FIRST_SOURCE_TYPE="website"
+# Business profile (populates the business_settings singleton).
+# business_name is required (NOT NULL); the rest are optional but
+# always nice to have for invoice headers, emails, audit logs.
+BUSINESS_NAME=""
+BUSINESS_TYPE=""
+BUSINESS_TIMEZONE="America/New_York"
+BUSINESS_CURRENCY="USD"
+BUSINESS_COUNTRY="US"
+BUSINESS_PHONE=""
+BUSINESS_EMAIL=""
+BUSINESS_WEBSITE=""
 SDK_LANG="none"
 INCLUDE_SEED_DATA=false
 NON_INTERACTIVE=false
@@ -37,15 +62,25 @@ MIN_DISK_GB=10
 # ============================================================
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --mode)               MODE="$2"; shift 2 ;;
-        --domain)             DOMAIN="$2"; shift 2 ;;
-        --admin-email)        ADMIN_EMAIL="$2"; shift 2 ;;
-        --first-source-code)  FIRST_SOURCE_CODE="$2"; shift 2 ;;
-        --first-source-name)  FIRST_SOURCE_NAME="$2"; shift 2 ;;
-        --sdks)               SDK_LANG="$2"; shift 2 ;;
-        --include-seed-data)  INCLUDE_SEED_DATA=true; shift ;;
-        --non-interactive)    NON_INTERACTIVE=true; shift ;;
-        --install-dir)        INSTALL_DIR="$2"; shift 2 ;;
+        --mode)                  MODE="$2"; shift 2 ;;
+        --domain)                DOMAIN="$2"; shift 2 ;;
+        --admin-email)           ADMIN_EMAIL="$2"; shift 2 ;;
+        --first-source-code)     FIRST_SOURCE_CODE="$2"; shift 2 ;;
+        --first-source-name)     FIRST_SOURCE_NAME="$2"; shift 2 ;;
+        --first-source-domain)   FIRST_SOURCE_DOMAIN="$2"; shift 2 ;;
+        --first-source-type)     FIRST_SOURCE_TYPE="$2"; shift 2 ;;
+        --business-name)         BUSINESS_NAME="$2"; shift 2 ;;
+        --business-type)         BUSINESS_TYPE="$2"; shift 2 ;;
+        --business-timezone)     BUSINESS_TIMEZONE="$2"; shift 2 ;;
+        --business-currency)     BUSINESS_CURRENCY="$2"; shift 2 ;;
+        --business-country)      BUSINESS_COUNTRY="$2"; shift 2 ;;
+        --business-phone)        BUSINESS_PHONE="$2"; shift 2 ;;
+        --business-email)        BUSINESS_EMAIL="$2"; shift 2 ;;
+        --business-website)      BUSINESS_WEBSITE="$2"; shift 2 ;;
+        --sdks)                  SDK_LANG="$2"; shift 2 ;;
+        --include-seed-data)     INCLUDE_SEED_DATA=true; shift ;;
+        --non-interactive)       NON_INTERACTIVE=true; shift ;;
+        --install-dir)           INSTALL_DIR="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -117,10 +152,38 @@ if ! $NON_INTERACTIVE; then
     if [[ -n "$DOMAIN" ]]; then
         prompt ADMIN_EMAIL "Admin email (for Let's Encrypt)" "$ADMIN_EMAIL"
     fi
-    prompt FIRST_SOURCE_CODE "First source code (slug)" "$FIRST_SOURCE_CODE"
-    prompt FIRST_SOURCE_NAME "First source display name" "$FIRST_SOURCE_NAME"
+    echo ""
+    echo "--- Business profile (populates business_settings) ---"
+    prompt BUSINESS_NAME     "Business name (required)"          "$BUSINESS_NAME"
+    prompt BUSINESS_TYPE     "Business type (e.g. dental)"       "$BUSINESS_TYPE"
+    prompt BUSINESS_TIMEZONE "Timezone (IANA)"                   "$BUSINESS_TIMEZONE"
+    prompt BUSINESS_CURRENCY "Currency (ISO 4217)"               "$BUSINESS_CURRENCY"
+    prompt BUSINESS_COUNTRY  "Country code (ISO 3166-1 alpha-2)" "$BUSINESS_COUNTRY"
+    prompt BUSINESS_PHONE    "Business phone (optional)"         "$BUSINESS_PHONE"
+    prompt BUSINESS_EMAIL    "Business email (optional)"         "$BUSINESS_EMAIL"
+    prompt BUSINESS_WEBSITE  "Business website (optional)"       "$BUSINESS_WEBSITE"
+    echo ""
+    echo "--- First source (the consumer-site identity, NOT bootstrap) ---"
+    prompt FIRST_SOURCE_CODE   "First source code (slug, e.g. my_business_website)" "$FIRST_SOURCE_CODE"
+    prompt FIRST_SOURCE_NAME   "First source display name"     "$FIRST_SOURCE_NAME"
+    prompt FIRST_SOURCE_DOMAIN "First source domain (e.g. mybusiness.com)" "$FIRST_SOURCE_DOMAIN"
+    prompt FIRST_SOURCE_TYPE   "First source type (website / webhook / mcp / other)" "$FIRST_SOURCE_TYPE"
+    echo ""
     prompt SDK_LANG "SDK languages to generate (all/python/php/typescript/none)" "$SDK_LANG"
     echo ""
+fi
+
+# ============================================================
+# Validate required fields
+# ============================================================
+if [[ -z "$BUSINESS_NAME" ]]; then
+    fail "--business-name is required (sets the business_settings.business_name NOT NULL field)."
+fi
+if [[ -z "$FIRST_SOURCE_CODE" || "$FIRST_SOURCE_CODE" == "bootstrap" ]]; then
+    fail "--first-source-code must be set to a per-business slug (e.g. ${BUSINESS_NAME// /_}_website). Using 'bootstrap' as a runtime identity is forbidden — see docs/Sources.rst."
+fi
+if [[ -z "$FIRST_SOURCE_NAME" ]]; then
+    FIRST_SOURCE_NAME="$BUSINESS_NAME Website"  # sensible default
 fi
 
 # ============================================================
@@ -401,27 +464,77 @@ done
 curl -sf http://127.0.0.1:8800/api/v1/health &>/dev/null \
     || fail "API did not become healthy within 60 seconds"
 
-# Create source if not bootstrap
-if [[ "$FIRST_SOURCE_CODE" != "bootstrap" ]]; then
-    curl -sf -X POST \
-        -H "X-API-Key: $CLIENTHUB_ROOT_API_KEY" \
-        -H "Content-Type: application/json" \
-        -d "{\"code\": \"$FIRST_SOURCE_CODE\", \"name\": \"$FIRST_SOURCE_NAME\", \"source_type\": \"website\"}" \
-        http://127.0.0.1:8800/api/v1/admin/sources >/dev/null
-    FIRST_SOURCE_UUID=$(curl -sf -H "X-API-Key: $CLIENTHUB_ROOT_API_KEY" \
-        http://127.0.0.1:8800/api/v1/admin/sources \
-        | python3 -c "import sys,json; sources=json.load(sys.stdin)['data']; print(next(s['uuid'] for s in sources if s['code']=='$FIRST_SOURCE_CODE'))")
-else
-    FIRST_SOURCE_UUID=$(curl -sf -H "X-API-Key: $CLIENTHUB_ROOT_API_KEY" \
-        http://127.0.0.1:8800/api/v1/admin/sources \
-        | python3 -c "import sys,json; sources=json.load(sys.stdin)['data']; print(next(s['uuid'] for s in sources if s['code']=='bootstrap'))")
-fi
+# Create the named source. The seeded ``bootstrap`` row is left in
+# place by the migrations but never used as a runtime identity. The
+# named row carries the consumer-site domain so the marketing-source
+# derivation can authoritatively classify same-domain referrers.
+SOURCE_PAYLOAD=$(python3 -c "
+import json,sys
+p = {'code': '${FIRST_SOURCE_CODE}',
+     'name': '${FIRST_SOURCE_NAME}',
+     'source_type': '${FIRST_SOURCE_TYPE}'}
+if '${FIRST_SOURCE_DOMAIN}':
+    p['domain'] = '${FIRST_SOURCE_DOMAIN}'
+print(json.dumps(p))
+")
+curl -sf -X POST \
+    -H "X-API-Key: $CLIENTHUB_ROOT_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$SOURCE_PAYLOAD" \
+    http://127.0.0.1:8800/api/v1/admin/sources >/dev/null \
+    || fail "Failed to create source ${FIRST_SOURCE_CODE}"
+
+FIRST_SOURCE_UUID=$(curl -sf -H "X-API-Key: $CLIENTHUB_ROOT_API_KEY" \
+    http://127.0.0.1:8800/api/v1/admin/sources \
+    | python3 -c "import sys,json; sources=json.load(sys.stdin)['data']; print(next(s['uuid'] for s in sources if s['code']=='$FIRST_SOURCE_CODE'))")
 
 # Insert API key directly into DB (we have the pre-generated key)
 KEY_PREFIX="${FIRST_SOURCE_API_KEY:0:8}"
 run_sql "INSERT INTO api_keys (uuid, source_id, key_prefix, key_value, name)
 SELECT UUID(), s.id, '${KEY_PREFIX}', '${FIRST_SOURCE_API_KEY}', 'Install-generated key'
 FROM sources s WHERE s.code = '${FIRST_SOURCE_CODE}';"
+
+# ============================================================
+# Populate business_settings (the singleton describing the business
+# that owns this Client Hub instance). This is what every install
+# should have been doing all along — earlier installs left the table
+# empty, which is now treated as a deployment defect.
+# Built with a Python helper so values containing quotes or
+# specials are escaped correctly into the SQL literal.
+# ============================================================
+log "Populating business_settings..."
+BUSINESS_INSERT_SQL=$(BIZ_NAME="$BUSINESS_NAME" \
+                      BIZ_TYPE="$BUSINESS_TYPE" \
+                      BIZ_TZ="$BUSINESS_TIMEZONE" \
+                      BIZ_CUR="$BUSINESS_CURRENCY" \
+                      BIZ_CTRY="$BUSINESS_COUNTRY" \
+                      BIZ_PHONE="$BUSINESS_PHONE" \
+                      BIZ_EMAIL="$BUSINESS_EMAIL" \
+                      BIZ_WEB="$BUSINESS_WEBSITE" \
+                      python3 - <<'PYEOF'
+import os
+def q(v):
+    if v is None or v == "":
+        return "NULL"
+    return "'" + v.replace("\\", "\\\\").replace("'", "\\'") + "'"
+sql = (
+    "INSERT INTO business_settings "
+    "(business_name, business_type, timezone, currency, country, "
+    "phone, email, website) VALUES ("
+    f"{q(os.environ['BIZ_NAME'])}, "
+    f"{q(os.environ.get('BIZ_TYPE'))}, "
+    f"{q(os.environ['BIZ_TZ'])}, "
+    f"{q(os.environ['BIZ_CUR'])}, "
+    f"{q(os.environ['BIZ_CTRY'])}, "
+    f"{q(os.environ.get('BIZ_PHONE'))}, "
+    f"{q(os.environ.get('BIZ_EMAIL'))}, "
+    f"{q(os.environ.get('BIZ_WEB'))})"
+)
+print(sql)
+PYEOF
+)
+run_sql "$BUSINESS_INSERT_SQL" >/dev/null \
+    || warn "business_settings insert failed (continuing) — populate manually if needed"
 
 # ============================================================
 # Firewall
