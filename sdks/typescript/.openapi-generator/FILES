@@ -10,6 +10,7 @@ src/apis/ContactsApi.ts
 src/apis/HealthApi.ts
 src/apis/InvoicesApi.ts
 src/apis/LookupApi.ts
+src/apis/MarketingSourcesApi.ts
 src/apis/OrdersApi.ts
 src/apis/OrganizationsApi.ts
 src/apis/SettingsApi.ts

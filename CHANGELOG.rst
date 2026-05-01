@@ -4,6 +4,82 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-v0-3-0:
+
+v0.3.0 — 2026-05-01 — Phone E.164 standardization + Marketing-source attribution
+================================================================================
+
+Two issues Steven flagged after v0.2.0 went out:
+
+**Phone numbers were free-form (VARCHAR with no validation).** Prod
+data was a mix of raw 10-digit, hyphenated, and parenthesized
+formats. ``GET /api/v1/lookup/phone/{number}`` does literal string
+equality, so the upcoming SIP/CTI integration would have failed any
+time the caller's E.164 didn't byte-match the stored format.
+
+- ``api/app/services/phone_utils.py`` (new): ``normalize_to_e164()``
+  helper that accepts every common US input shape (10 digits with or
+  without formatting; 11-digit with leading ``1``; already-E.164) and
+  returns canonical ``+15558675309``. Raises
+  ``PhoneNormalizationError`` on garbage. 28 unit tests covering
+  every realistic input variant including the actual prod values.
+- ``api/app/schemas/contact.py``: a Pydantic ``field_validator`` on
+  ``ContactCreatePhone.number`` calls the normalizer in flight, so
+  consumer sites need not change anything — they keep submitting
+  whatever format the form collects, the API normalizes server-side.
+- ``api/app/services/lookup_service.py``: the lookup endpoint
+  normalizes its path parameter the same way before query, so a SIP
+  query of ``8035551212`` now matches a stored ``+18035551212``.
+  Format-agnostic lookups verified via 4 new parametrized tests.
+- ``migrations/027_phone_e164_normalization.sql``: backfills every
+  existing ``contact_phones.phone_number`` and
+  ``org_phones.phone_number`` row to E.164 using a CASE expression
+  over ``REGEXP_REPLACE``, then adds a CHECK constraint
+  (``^\\+[0-9]{10,15}$``) at the DB layer as defense-in-depth so any
+  future direct-DB writer can't pollute the column.
+
+**``contact_marketing_sources`` junction was always empty.** The
+schema and API contract had supported ``marketing_sources: list[str]``
+on ``POST /contacts`` since v0.1.0, but no consumer site was sending
+it and there was no fallback derivation. Both prod instances had 0
+junction rows despite 22 contacts.
+
+- ``api/app/services/marketing_source_service.py`` (new):
+  ``derive_codes(external_refs_json) → list[code]`` that maps UTM
+  params + referrer hostname to a code from the seeded lookup table.
+  Conservative defaulting to ``"website"`` when no signal is present
+  (the SEO-traffic case). ``attach_codes(...)`` writes the junction
+  with ``source_detail`` of ``"explicit"`` (consumer-site supplied)
+  or ``"derived"`` (auto-attributed) so the two are distinguishable
+  in analytics. ``list_active_marketing_sources(...)`` powers the
+  new public endpoint.
+- ``api/app/services/contact_service.py::create_contact``: when the
+  payload's ``marketing_sources`` is empty, derivation runs
+  automatically. Explicit lists always win.
+- ``api/app/routers/marketing_sources.py`` (new): exposes
+  ``GET /api/v1/marketing-sources`` (source-key gated, mirrors the
+  ``/spam-patterns`` pattern) so consumer sites pull canonical
+  codes at build time rather than hardcoding.
+- ``scripts/backfill-marketing-sources.sql``: idempotent one-shot
+  for existing contacts. Pure SQL (no Python deps) so it runs from
+  any mariadb client. Tagged ``source_detail='derived-backfill'`` so
+  retroactive attribution is distinguishable from in-flight.
+- 17 new tests in ``api/tests/test_marketing_source_derivation.py``
+  covering pure derivation logic + end-to-end through POST/GET +
+  the public listing endpoint.
+
+**Knowledge-transfer prompts** for the two consumer sites that feed
+this Client Hub today, in ``docs/handoffs/cdc-v0.3.0.md`` and
+``docs/handoffs/clever-orchid-v0.3.0.md``. Both confirm the sites
+need no changes today (the API derives ``website`` for current
+SEO-only traffic) and document the future-work checklist for when
+paid ads / email outreach launch (first-touch UTM capture in a
+30-day cookie, forwarded as ``external_refs_json.extra.utm_*``).
+
+**Test suite:** 180 tests, all passing (was 125 in v0.2.0; net +55
+covering phone normalization + marketing derivation). Ruff +
+rstcheck clean.
+
 .. _client-hub-changelog-v0-2-0:
 
 v0.2.0 — 2026-05-01 — Spam-Defense Hardening + Versioning Foundations

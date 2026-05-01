@@ -11,6 +11,7 @@ docs/Api/ContactsApi.md
 docs/Api/HealthApi.md
 docs/Api/InvoicesApi.md
 docs/Api/LookupApi.md
+docs/Api/MarketingSourcesApi.md
 docs/Api/OrdersApi.md
 docs/Api/OrganizationsApi.md
 docs/Api/SettingsApi.md
@@ -57,6 +58,7 @@ lib/Api/ContactsApi.php
 lib/Api/HealthApi.php
 lib/Api/InvoicesApi.php
 lib/Api/LookupApi.php
+lib/Api/MarketingSourcesApi.php
 lib/Api/OrdersApi.php
 lib/Api/OrganizationsApi.php
 lib/Api/SettingsApi.php
@@ -108,6 +110,7 @@ test/Api/ContactsApiTest.php
 test/Api/HealthApiTest.php
 test/Api/InvoicesApiTest.php
 test/Api/LookupApiTest.php
+test/Api/MarketingSourcesApiTest.php
 test/Api/OrdersApiTest.php
 test/Api/OrganizationsApiTest.php
 test/Api/SettingsApiTest.php

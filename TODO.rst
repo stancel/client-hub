@@ -375,6 +375,37 @@ the fleet scale arrives, sequenced smallest-first.
   instance is one command from "VPS exists" to "Client Hub
   running with auto-upgrade enabled"
 
+.. _client-hub-todo-phase16:
+
+Phase 16 — Phone E.164 standardization + Marketing-source attribution [COMPLETE]
+================================================================================
+
+Closing the two issues Steven flagged after v0.2.0. See
+``docs/handoffs/cdc-v0.3.0.md`` and
+``docs/handoffs/clever-orchid-v0.3.0.md`` and the ``v0.3.0``
+changelog entry.
+
+- [x] ``api/app/services/phone_utils.py::normalize_to_e164`` — single
+  point of phone normalization; 28 unit tests
+- [x] Pydantic ``field_validator`` on ``ContactCreatePhone.number``
+  normalizes at ingestion (consumer sites need no change)
+- [x] ``lookup_service.lookup_by_phone`` normalizes the path param
+  before query; format-agnostic lookups verified
+- [x] Migration 027 — backfill ``contact_phones`` and ``org_phones``
+  to E.164 + DB-layer CHECK constraint
+- [x] ``api/app/services/marketing_source_service.py`` — derivation
+  rules + ``attach_codes`` writer
+- [x] ``contact_service.create_contact`` runs derivation when the
+  payload's ``marketing_sources`` is empty
+- [x] New public endpoint ``GET /api/v1/marketing-sources``
+  (source-key gated; mirrors ``/spam-patterns`` pattern)
+- [x] ``scripts/backfill-marketing-sources.sql`` — idempotent SQL
+  one-shot for existing contacts
+- [x] KT handoff docs in ``docs/handoffs/`` for both consumer sites
+- [x] 174 tests, all green; ruff + rstcheck clean
+- [ ] Deploy v0.3.0 to CDC + run backfill SQL
+- [ ] Deploy v0.3.0 to Clever Orchid + run backfill SQL
+
 .. _client-hub-todo-future:
 
 Future — Planned Work

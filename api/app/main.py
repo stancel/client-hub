@@ -10,6 +10,7 @@ from app.routers import (
     health,
     invoices,
     lookup,
+    marketing_sources,
     orders,
     organizations,
     settings,
@@ -62,3 +63,4 @@ app.include_router(settings.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(spam.public_router, prefix="/api/v1")
 app.include_router(spam.admin_router, prefix="/api/v1")
+app.include_router(marketing_sources.public_router, prefix="/api/v1")

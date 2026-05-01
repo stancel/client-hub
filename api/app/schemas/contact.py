@@ -2,9 +2,10 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.schemas.affiliation import InlineAffiliationCreate
+from app.services.phone_utils import PhoneNormalizationError, normalize_to_e164
 
 
 class PhoneOut(BaseModel):
@@ -114,6 +115,21 @@ class ContactCreatePhone(BaseModel):
     type: str = "mobile"
     is_primary: bool = False
     affiliation_uuid: str | None = None
+
+    @field_validator("number", mode="before")
+    @classmethod
+    def _normalize_phone(cls, v: str) -> str:
+        """Coerce every inbound phone to E.164 (``+15558675309``).
+
+        Storage is normalized so the SIP/CTI lookup endpoint and future
+        dedup don't break on formatting variants. Display formatting is
+        the caller's concern. See ``app.services.phone_utils`` for the
+        full contract.
+        """
+        try:
+            return normalize_to_e164(v)
+        except PhoneNormalizationError as e:
+            raise ValueError(str(e)) from e
 
 
 class ContactCreateEmail(BaseModel):

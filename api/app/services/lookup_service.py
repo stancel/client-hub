@@ -11,13 +11,28 @@ from app.models.contact import (
     ContactTagMap,
 )
 from app.models.order import Order
+from app.services.phone_utils import PhoneNormalizationError, normalize_to_e164
 
 
 async def lookup_by_phone(db: AsyncSession, phone_number: str, exact: bool = True):
+    # Storage is E.164 (see app.services.phone_utils). Normalize the inbound
+    # path parameter the same way so a SIP/CTI query of "8035551212" matches
+    # a stored "+18035551212" — and so any pre-formatted "(803) 555-1212"
+    # also resolves. If normalization fails (garbage input), the exact path
+    # silently returns no matches; the substring path can still fuzzy-search.
     if exact:
-        stmt = select(ContactPhone).where(ContactPhone.phone_number == phone_number)
+        try:
+            normalized = normalize_to_e164(phone_number)
+        except PhoneNormalizationError:
+            return []
+        stmt = select(ContactPhone).where(ContactPhone.phone_number == normalized)
     else:
-        stmt = select(ContactPhone).where(ContactPhone.phone_number.like(f"%{phone_number}%"))
+        # For substring search, reduce the input to digits only so callers
+        # can paste any format and still get fuzzy matches against stored
+        # E.164 values.
+        digits = "".join(ch for ch in phone_number if ch.isdigit())
+        needle = digits or phone_number
+        stmt = select(ContactPhone).where(ContactPhone.phone_number.like(f"%{needle}%"))
 
     result = await db.execute(stmt)
     phone_rows = result.scalars().all()

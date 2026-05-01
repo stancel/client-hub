@@ -13,6 +13,7 @@ clienthub/api/contacts_api.py
 clienthub/api/health_api.py
 clienthub/api/invoices_api.py
 clienthub/api/lookup_api.py
+clienthub/api/marketing_sources_api.py
 clienthub/api/orders_api.py
 clienthub/api/organizations_api.py
 clienthub/api/settings_api.py
@@ -79,6 +80,7 @@ docs/InvoiceCreate.md
 docs/InvoicesApi.md
 docs/LookupApi.md
 docs/MarketingOptOuts.md
+docs/MarketingSourcesApi.md
 docs/OrderCreate.md
 docs/OrderItemCreate.md
 docs/OrdersApi.md
@@ -131,6 +133,7 @@ test/test_invoice_create.py
 test/test_invoices_api.py
 test/test_lookup_api.py
 test/test_marketing_opt_outs.py
+test/test_marketing_sources_api.py
 test/test_order_create.py
 test/test_order_item_create.py
 test/test_orders_api.py

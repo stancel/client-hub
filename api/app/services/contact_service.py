@@ -19,11 +19,17 @@ from app.models.contact import (
     ContactTagMap,
 )
 from app.models.invoice import Invoice
-from app.models.lookups import ContactType, EmailType, MarketingSource, PhoneType
+from app.models.lookups import ContactType, EmailType, PhoneType
 from app.models.order import Order
 from app.services.affiliation_service import (
     create_affiliation,
     get_primary_affiliation,
+)
+from app.services.marketing_source_service import (
+    attach_codes as attach_marketing_codes,
+)
+from app.services.marketing_source_service import (
+    derive_codes as derive_marketing_codes,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,15 +187,20 @@ async def create_contact(db: AsyncSession, data: dict, source_id: int | None = N
                 data_source=data.get("data_source"),
             ))
 
-    # Marketing sources
-    for src_code in data.get("marketing_sources", []):
-        ms_result = await db.execute(select(MarketingSource).where(MarketingSource.code == src_code))
-        ms = ms_result.scalar_one_or_none()
-        if ms:
-            contact.marketing_sources.append(ContactMarketingSource(
-                marketing_source_id=ms.id,
-                attributed_at=datetime.now(timezone.utc),
-            ))
+    # Marketing sources — explicit list from the payload wins; if empty,
+    # derive from external_refs_json (UTM params + referrer hostname)
+    # so the contact_marketing_sources junction is never empty when we
+    # have any signal. See app.services.marketing_source_service.
+    explicit_codes = list(data.get("marketing_sources") or [])
+    if explicit_codes:
+        await attach_marketing_codes(
+            db, contact, explicit_codes, source_detail="explicit",
+        )
+    else:
+        derived_codes = derive_marketing_codes(data.get("external_refs_json"))
+        await attach_marketing_codes(
+            db, contact, derived_codes, source_detail="derived",
+        )
 
     db.add(contact)
     await db.commit()
