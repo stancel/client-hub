@@ -301,8 +301,12 @@ Soft-Signal Audit Log) and the ``2026-05-01`` changelog entry.
   full suite is 125 tests, all green; ruff clean
 - [x] Regenerate SDKs (``CommCreate.external_refs_json`` is a
   public-API change) — bumped to v0.2.0
-- [ ] Deploy + run backfill on Complete Dental Care VPS
-- [ ] Deploy + run backfill on Clever Orchid VPS
+- [x] Deploy + run backfill on Complete Dental Care VPS — live on
+  v0.2.0; ``spam_rate_log`` IP key now shows ``43.246.220.151``
+  (the real Hoff & Mazor IP) instead of the docker bridge peer
+- [x] Deploy + run backfill on Clever Orchid VPS — live on
+  v0.2.0; ``spam_rate_log`` IP key now shows ``172.59.217.107``
+  (Mike Augustin's real IP) instead of the docker bridge peer
 
 .. _client-hub-todo-phase15:
 
