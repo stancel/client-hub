@@ -12,6 +12,7 @@ from app.models.contact import Contact, ContactEmail, ContactPhone
 from app.models.invoice import Invoice, Payment
 from app.models.lookups import ChannelType, InvoiceStatus, PaymentMethod
 from app.models.source import Source
+from app.services.request_meta import extract_request_meta
 from app.services.spam_filter_service import (
     IntakePayload,
     spam_check_or_raise,
@@ -89,11 +90,13 @@ async def chatwoot_webhook(
         # Spam guard — Chatwoot widget is public-facing on the consumer
         # site, so messages here can carry the same spam payloads as a
         # plain contact form. Run the filter before any DB write.
+        ip, ua = extract_request_meta(request, payload_external_refs=None)
         intake = IntakePayload(
             email=email,
             phone=phone,
             body=data.get("content"),
-            remote_ip=(request.client.host if request.client else None),
+            remote_ip=ip,
+            user_agent=ua,
         )
         await spam_check_or_raise(
             db, intake,

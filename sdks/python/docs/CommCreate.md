@@ -14,6 +14,7 @@ Name | Type | Description | Notes
 **order_uuid** | **str** |  | [optional] 
 **external_message_id** | **str** |  | [optional] 
 **created_by** | **str** |  | [optional] 
+**external_refs_json** | **Dict[str, object]** |  | [optional] 
 
 ## Example
 

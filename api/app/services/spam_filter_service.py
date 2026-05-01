@@ -41,6 +41,16 @@ RATE_LIMIT_WINDOW_SECONDS = 600  # 10 minutes
 RATE_LIMIT_PRUNE_AGE_SECONDS = 3600  # 1 hour
 PHRASE_MATCHES_REQUIRED_FOR_REJECTION = 2
 
+# Rate-limit hit thresholds per key_type within RATE_LIMIT_WINDOW_SECONDS.
+# Email keys are intentionally aggressive (1 prior hit = block) because a
+# duplicate email within 10 min is almost always automated. IP is loose so
+# legitimate office NAT traffic isn't punished.
+RATE_LIMIT_THRESHOLDS: dict[str, int] = {
+    "email": 1,
+    "email_body_hash": 1,
+    "ip": 5,
+}
+
 
 # =============================================================================
 # Public dataclasses
@@ -53,6 +63,7 @@ class IntakePayload:
     phone: str | None
     body: str | None
     remote_ip: str | None = None
+    user_agent: str | None = None
 
 
 @dataclass
@@ -157,55 +168,65 @@ def _body_hash(body: str | None) -> str | None:
 
 
 async def _is_rate_limited(db: AsyncSession, intake: IntakePayload) -> bool:
-    """Check if (email) or (email||body_hash) has been seen in the last 10 min."""
-    if not intake.email:
-        return False
-
-    keys: list[tuple[str, str]] = [("email", intake.email.lower())]
-    bh = _body_hash(intake.body)
-    if bh:
-        keys.append(("email_body_hash", f"{intake.email.lower()}|{bh}"))
+    """Check email / email||body_hash / IP keys against per-type thresholds."""
+    keys: list[tuple[str, str]] = []
+    if intake.email:
+        keys.append(("email", intake.email.lower()))
+        bh = _body_hash(intake.body)
+        if bh:
+            keys.append(("email_body_hash", f"{intake.email.lower()}|{bh}"))
+    if intake.remote_ip:
+        keys.append(("ip", intake.remote_ip))
 
     for key_type, key_value in keys:
+        threshold = RATE_LIMIT_THRESHOLDS.get(key_type, 1)
         stmt = text(
-            "SELECT 1 FROM spam_rate_log "
+            "SELECT COUNT(*) FROM spam_rate_log "
             "WHERE key_type = :kt AND key_value = :kv "
-            "AND occurred_at > DATE_SUB(NOW(), INTERVAL :w SECOND) LIMIT 1"
+            "AND occurred_at > DATE_SUB(NOW(), INTERVAL :w SECOND)"
         )
         result = await db.execute(
             stmt, {"kt": key_type, "kv": key_value, "w": RATE_LIMIT_WINDOW_SECONDS}
         )
-        if result.first() is not None:
+        count = result.scalar() or 0
+        if count >= threshold:
             return True
     return False
 
 
-async def _record_rate_log(db: AsyncSession, intake: IntakePayload) -> None:
+async def _record_rate_log(
+    db: AsyncSession, intake: IntakePayload, *, source_id: int | None = None
+) -> None:
     """Stamp the rate-log so future submissions can see this happened.
 
-    Also opportunistically prunes rows older than 1 hour to keep the table bounded.
-    """
-    if not intake.email:
-        return
+    Records source_id and user_agent for per-source scoping and forensics.
+    Opportunistically prunes rows older than 1 hour to keep the table bounded.
 
-    rows: list[dict[str, Any]] = [
-        {"kt": "email", "kv": intake.email.lower()}
-    ]
-    bh = _body_hash(intake.body)
-    if bh:
-        rows.append(
-            {"kt": "email_body_hash", "kv": f"{intake.email.lower()}|{bh}"}
-        )
+    A row is recorded for every available key (email, email||body_hash, ip),
+    not only when an email is present — IP-only traffic (e.g. communications
+    posts that carry no email) still needs a rate-limit footprint.
+    """
+    rows: list[dict[str, Any]] = []
+    if intake.email:
+        rows.append({"kt": "email", "kv": intake.email.lower()})
+        bh = _body_hash(intake.body)
+        if bh:
+            rows.append(
+                {"kt": "email_body_hash", "kv": f"{intake.email.lower()}|{bh}"}
+            )
     if intake.remote_ip:
         rows.append({"kt": "ip", "kv": intake.remote_ip})
 
     for r in rows:
+        r["sid"] = source_id
+        r["ua"] = intake.user_agent
         # INSERT IGNORE because PK is (key_type, key_value, occurred_at) — at sub-
         # second resolution distinct, but we ignore the rare collision anyway.
         await db.execute(
             text(
-                "INSERT IGNORE INTO spam_rate_log (key_type, key_value, occurred_at) "
-                "VALUES (:kt, :kv, NOW())"
+                "INSERT IGNORE INTO spam_rate_log "
+                "(key_type, key_value, source_id, user_agent, occurred_at) "
+                "VALUES (:kt, :kv, :sid, :ua, NOW(6))"
             ),
             r,
         )
@@ -225,62 +246,92 @@ async def _record_rate_log(db: AsyncSession, intake: IntakePayload) -> None:
 # =============================================================================
 async def evaluate_intake(
     db: AsyncSession, intake: IntakePayload
-) -> SpamVerdict | None:
-    """Return a SpamVerdict on rejection, or None if clean."""
+) -> tuple[SpamVerdict | None, SpamPattern | None]:
+    """Return ``(verdict, soft_signal_match)``.
+
+    ``verdict`` is None on clean payloads and a SpamVerdict on rejection.
+    ``soft_signal_match`` is the first phrase_regex match when the body
+    matched at least one phrase pattern but **fewer than the rejection
+    threshold** — used to log a 'soft_signal' spam_event for operator review
+    without rejecting. Always None on rejected payloads (the verdict already
+    captures the reason).
+    """
 
     # 1) Phone digit-count check (always-on — not a DB pattern)
     if intake.phone is not None and not is_valid_us_phone(intake.phone):
-        return SpamVerdict(
-            rejection_reason="phone_invalid",
-            matched_pattern_id=None,
-            matched_pattern_text=None,
+        return (
+            SpamVerdict(
+                rejection_reason="phone_invalid",
+                matched_pattern_id=None,
+                matched_pattern_text=None,
+            ),
+            None,
         )
 
     patterns = await _load_active_patterns(db)
 
     # 2) Phone country-code block patterns
     if (m := _evaluate_phone(intake.phone, patterns)) is not None:
-        return SpamVerdict(
-            rejection_reason="phone_invalid",
-            matched_pattern_id=m.id,
-            matched_pattern_text=m.pattern,
+        return (
+            SpamVerdict(
+                rejection_reason="phone_invalid",
+                matched_pattern_id=m.id,
+                matched_pattern_text=m.pattern,
+            ),
+            None,
         )
 
     # 3) Email patterns
     if (m := _evaluate_email(intake.email, patterns)) is not None:
-        return SpamVerdict(
-            rejection_reason="email_blocked",
-            matched_pattern_id=m.id,
-            matched_pattern_text=m.pattern,
+        return (
+            SpamVerdict(
+                rejection_reason="email_blocked",
+                matched_pattern_id=m.id,
+                matched_pattern_text=m.pattern,
+            ),
+            None,
         )
 
     # 4) Body URL patterns
     if (m := _evaluate_body_url(intake.body, patterns)) is not None:
-        return SpamVerdict(
-            rejection_reason="url_blocked",
-            matched_pattern_id=m.id,
-            matched_pattern_text=m.pattern,
+        return (
+            SpamVerdict(
+                rejection_reason="url_blocked",
+                matched_pattern_id=m.id,
+                matched_pattern_text=m.pattern,
+            ),
+            None,
         )
 
     # 5) Body phrase patterns — require ≥ N matches
     phrase_matches = _evaluate_body_phrases(intake.body, patterns)
     if len(phrase_matches) >= PHRASE_MATCHES_REQUIRED_FOR_REJECTION:
         first = phrase_matches[0]
-        return SpamVerdict(
-            rejection_reason="phrase_combo",
-            matched_pattern_id=first.id,
-            matched_pattern_text=first.pattern,
+        return (
+            SpamVerdict(
+                rejection_reason="phrase_combo",
+                matched_pattern_id=first.id,
+                matched_pattern_text=first.pattern,
+            ),
+            None,
         )
 
     # 6) Rate-limit check (last — so phone/email/body match first for clearer signal)
     if await _is_rate_limited(db, intake):
-        return SpamVerdict(
-            rejection_reason="rate_limit",
-            matched_pattern_id=None,
-            matched_pattern_text=None,
+        return (
+            SpamVerdict(
+                rejection_reason="rate_limit",
+                matched_pattern_id=None,
+                matched_pattern_text=None,
+            ),
+            None,
         )
 
-    return None
+    # Clean — but flag any single phrase match as a soft signal so operators
+    # can review and potentially promote the pattern (lower threshold or add
+    # complementary patterns).
+    soft_signal = phrase_matches[0] if phrase_matches else None
+    return (None, soft_signal)
 
 
 # =============================================================================
@@ -302,6 +353,7 @@ async def _record_spam_event(
         endpoint=endpoint,
         integration_kind=integration_kind,
         remote_ip=intake.remote_ip,
+        user_agent=intake.user_agent,
         submitted_email=intake.email,
         submitted_phone=intake.phone,
         submitted_body_hash=_body_hash(intake.body),
@@ -326,6 +378,37 @@ async def _record_spam_event(
     await db.commit()
 
 
+async def _record_soft_signal(
+    db: AsyncSession,
+    *,
+    intake: IntakePayload,
+    matched: SpamPattern,
+    source_id: int | None,
+    endpoint: str,
+    integration_kind: str,
+    payload: dict[str, Any] | None,
+) -> None:
+    """Log a 'soft_signal' spam_event for an allowed payload that hit at least
+    one phrase pattern (below the rejection threshold). The submission still
+    goes through; this row is purely for operator review."""
+    event = SpamEvent(
+        uuid=str(uuid_mod.uuid4()),
+        source_id=source_id,
+        endpoint=endpoint,
+        integration_kind=integration_kind,
+        remote_ip=intake.remote_ip,
+        user_agent=intake.user_agent,
+        submitted_email=intake.email,
+        submitted_phone=intake.phone,
+        submitted_body_hash=_body_hash(intake.body),
+        matched_pattern_id=matched.id,
+        matched_pattern_text=matched.pattern,
+        rejection_reason="soft_signal",
+        payload_json=json.dumps(payload) if payload is not None else None,
+    )
+    db.add(event)
+
+
 # =============================================================================
 # Public guard for handlers — one-liner to inherit the framework
 # =============================================================================
@@ -342,9 +425,11 @@ async def spam_check_or_raise(
 
     On a clean payload, also records the rate-log so future submissions can
     detect bursts. On rejection, records a spam_events row and bumps the
-    matched pattern's hit_count.
+    matched pattern's hit_count. On a clean-but-suspicious payload (one phrase
+    match, below threshold) also writes a 'soft_signal' spam_event for
+    operator review.
     """
-    verdict = await evaluate_intake(db, intake)
+    verdict, soft_signal = await evaluate_intake(db, intake)
     if verdict is not None:
         await _record_spam_event(
             db,
@@ -361,8 +446,18 @@ async def spam_check_or_raise(
             detail="Submission rejected. Please try again or contact us by phone.",
         )
 
-    # Clean — record rate-log
-    await _record_rate_log(db, intake)
+    # Clean — record rate-log + (if any phrase pattern grazed) a soft-signal
+    if soft_signal is not None:
+        await _record_soft_signal(
+            db,
+            intake=intake,
+            matched=soft_signal,
+            source_id=source_id,
+            endpoint=endpoint,
+            integration_kind=integration_kind,
+            payload=payload,
+        )
+    await _record_rate_log(db, intake, source_id=source_id)
     await db.commit()
 
 
@@ -566,6 +661,7 @@ def _serialize_event(
         "endpoint": ev.endpoint,
         "integration_kind": ev.integration_kind,
         "remote_ip": ev.remote_ip,
+        "user_agent": ev.user_agent,
         "submitted_email": ev.submitted_email,
         "submitted_phone": ev.submitted_phone,
         "submitted_body_hash": ev.submitted_body_hash,

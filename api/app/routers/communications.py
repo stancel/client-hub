@@ -13,6 +13,7 @@ from app.models.contact import Contact
 from app.models.lookups import ChannelType
 from app.models.order import Order
 from app.models.source import Source
+from app.services.request_meta import extract_request_meta
 from app.services.spam_filter_service import (
     IntakePayload,
     spam_check_or_raise,
@@ -31,6 +32,10 @@ class CommCreate(BaseModel):
     order_uuid: str | None = None
     external_message_id: str | None = None
     created_by: str | None = None
+    # Optional integration metadata — consumer sites pass ip_address and
+    # user_agent here (extracted from CF-Connecting-IP server-side); the spam
+    # filter prefers these over the request peer for source-key endpoints.
+    external_refs_json: dict | None = None
 
 
 @router.get("")
@@ -102,11 +107,15 @@ async def create_communication(
     # We don't have email/phone on a CommCreate (the contact is referenced by
     # uuid), so the filter only sees `body` content + IP — but that's enough
     # for url/phrase patterns and rate-limit on body_hash.
+    ip, ua = extract_request_meta(
+        request, payload_external_refs=body.external_refs_json
+    )
     intake = IntakePayload(
         email=None,
         phone=None,
         body=body.body,
-        remote_ip=(request.client.host if request.client else None),
+        remote_ip=ip,
+        user_agent=ua,
     )
     await spam_check_or_raise(
         db, intake,

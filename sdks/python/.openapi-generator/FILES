@@ -16,6 +16,8 @@ clienthub/api/lookup_api.py
 clienthub/api/orders_api.py
 clienthub/api/organizations_api.py
 clienthub/api/settings_api.py
+clienthub/api/spam_admin_api.py
+clienthub/api/spam_patterns_api.py
 clienthub/api/webhooks_api.py
 clienthub/api_client.py
 clienthub/api_response.py
@@ -46,6 +48,8 @@ clienthub/models/quantity.py
 clienthub/models/settings_update.py
 clienthub/models/source_create.py
 clienthub/models/source_update.py
+clienthub/models/spam_pattern_create.py
+clienthub/models/spam_pattern_update.py
 clienthub/models/status_change.py
 clienthub/models/subtotal.py
 clienthub/models/tax_amount.py
@@ -88,6 +92,10 @@ docs/SettingsApi.md
 docs/SettingsUpdate.md
 docs/SourceCreate.md
 docs/SourceUpdate.md
+docs/SpamAdminApi.md
+docs/SpamPatternCreate.md
+docs/SpamPatternUpdate.md
+docs/SpamPatternsApi.md
 docs/StatusChange.md
 docs/Subtotal.md
 docs/TaxAmount.md
@@ -136,6 +144,10 @@ test/test_settings_api.py
 test/test_settings_update.py
 test/test_source_create.py
 test/test_source_update.py
+test/test_spam_admin_api.py
+test/test_spam_pattern_create.py
+test/test_spam_pattern_update.py
+test/test_spam_patterns_api.py
 test/test_status_change.py
 test/test_subtotal.py
 test/test_tax_amount.py

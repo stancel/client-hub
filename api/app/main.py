@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 
 from app.routers import (
@@ -15,10 +17,30 @@ from app.routers import (
     webhooks,
 )
 
+
+def _read_version() -> str:
+    """Single source of truth for the Client Hub API version.
+
+    The ``VERSION`` file at the api/ project root is read at import time
+    and exposed via the FastAPI ``/openapi.json`` and ``/docs`` UIs. The
+    same file is consumed by ``scripts/generate-sdks.sh`` so SDK package
+    versions move in lockstep, and by the release flow which tags
+    ``vX.Y.Z`` at the corresponding commit.
+    """
+    version_path = Path(__file__).resolve().parent.parent / "VERSION"
+    try:
+        return version_path.read_text(encoding="utf-8").strip() or "0.0.0"
+    except FileNotFoundError:
+        return "0.0.0"
+
+
+__version__ = _read_version()
+
+
 app = FastAPI(
     title="Client Hub API",
     description="Data-first customer intelligence microservice",
-    version="0.1.0",
+    version=__version__,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",

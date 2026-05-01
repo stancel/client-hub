@@ -13,6 +13,8 @@ src/apis/LookupApi.ts
 src/apis/OrdersApi.ts
 src/apis/OrganizationsApi.ts
 src/apis/SettingsApi.ts
+src/apis/SpamAdminApi.ts
+src/apis/SpamPatternsApi.ts
 src/apis/WebhooksApi.ts
 src/apis/index.ts
 src/index.ts
@@ -40,6 +42,8 @@ src/models/Quantity.ts
 src/models/SettingsUpdate.ts
 src/models/SourceCreate.ts
 src/models/SourceUpdate.ts
+src/models/SpamPatternCreate.ts
+src/models/SpamPatternUpdate.ts
 src/models/StatusChange.ts
 src/models/Subtotal.ts
 src/models/TaxAmount.ts

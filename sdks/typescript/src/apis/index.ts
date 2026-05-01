@@ -10,4 +10,6 @@ export * from './LookupApi';
 export * from './OrdersApi';
 export * from './OrganizationsApi';
 export * from './SettingsApi';
+export * from './SpamAdminApi';
+export * from './SpamPatternsApi';
 export * from './WebhooksApi';

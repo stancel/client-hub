@@ -21,9 +21,24 @@ API_URL="${CLIENT_HUB_API_URL:-http://10.0.1.220:8800}"
 GENERATOR_IMAGE="openapitools/openapi-generator-cli:v7.12.0"
 LANGUAGE="${1:-all}"
 
+# Single source of truth for SDK package versions — same file FastAPI reads.
+VERSION_FILE="$PROJECT_DIR/api/VERSION"
+if [[ -f "$VERSION_FILE" ]]; then
+    PACKAGE_VERSION="$(tr -d ' \t\n\r' < "$VERSION_FILE")"
+else
+    PACKAGE_VERSION="0.0.0"
+fi
+
+# Resolve current uid:gid so the generator container writes files we own.
+# (Older runs that wrote root-owned files can be normalized in one step
+# with: docker run --rm -v "$SDK_DIR:/work" alpine chown -R "$(id -u):$(id -g)" /work)
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
+
 echo "=== Client Hub SDK Generator ==="
 echo "API URL: $API_URL"
 echo "SDK dir: $SDK_DIR"
+echo "Version: $PACKAGE_VERSION"
 echo ""
 
 # Step 1: Fetch OpenAPI spec
@@ -39,18 +54,19 @@ generate_sdk() {
     local output_dir="$SDK_DIR/$lang"
     local extra_args="${3:-}"
 
-    echo "Generating $lang SDK..."
+    echo "Generating $lang SDK (v$PACKAGE_VERSION)..."
     rm -rf "$output_dir"
     mkdir -p "$output_dir"
 
     docker run --rm \
+        --user "$HOST_UID:$HOST_GID" \
         -v "$SDK_DIR:/sdk" \
         "$GENERATOR_IMAGE" generate \
         -i "/sdk/openapi.json" \
         -g "$generator" \
         -o "/sdk/$lang" \
         --package-name clienthub \
-        --additional-properties=projectName=clienthub \
+        --additional-properties=projectName=clienthub,packageVersion=$PACKAGE_VERSION \
         $extra_args \
         2>&1 | tail -5
 

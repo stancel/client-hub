@@ -14,6 +14,8 @@ docs/Api/LookupApi.md
 docs/Api/OrdersApi.md
 docs/Api/OrganizationsApi.md
 docs/Api/SettingsApi.md
+docs/Api/SpamAdminApi.md
+docs/Api/SpamPatternsApi.md
 docs/Api/WebhooksApi.md
 docs/Model/AffiliationCreate.md
 docs/Model/AffiliationUpdate.md
@@ -39,6 +41,8 @@ docs/Model/Quantity.md
 docs/Model/SettingsUpdate.md
 docs/Model/SourceCreate.md
 docs/Model/SourceUpdate.md
+docs/Model/SpamPatternCreate.md
+docs/Model/SpamPatternUpdate.md
 docs/Model/StatusChange.md
 docs/Model/Subtotal.md
 docs/Model/TaxAmount.md
@@ -56,6 +60,8 @@ lib/Api/LookupApi.php
 lib/Api/OrdersApi.php
 lib/Api/OrganizationsApi.php
 lib/Api/SettingsApi.php
+lib/Api/SpamAdminApi.php
+lib/Api/SpamPatternsApi.php
 lib/Api/WebhooksApi.php
 lib/ApiException.php
 lib/Configuration.php
@@ -85,6 +91,8 @@ lib/Model/Quantity.php
 lib/Model/SettingsUpdate.php
 lib/Model/SourceCreate.php
 lib/Model/SourceUpdate.php
+lib/Model/SpamPatternCreate.php
+lib/Model/SpamPatternUpdate.php
 lib/Model/StatusChange.php
 lib/Model/Subtotal.php
 lib/Model/TaxAmount.php
@@ -103,6 +111,8 @@ test/Api/LookupApiTest.php
 test/Api/OrdersApiTest.php
 test/Api/OrganizationsApiTest.php
 test/Api/SettingsApiTest.php
+test/Api/SpamAdminApiTest.php
+test/Api/SpamPatternsApiTest.php
 test/Api/WebhooksApiTest.php
 test/Model/AffiliationCreateTest.php
 test/Model/AffiliationUpdateTest.php
@@ -128,6 +138,8 @@ test/Model/QuantityTest.php
 test/Model/SettingsUpdateTest.php
 test/Model/SourceCreateTest.php
 test/Model/SourceUpdateTest.php
+test/Model/SpamPatternCreateTest.php
+test/Model/SpamPatternUpdateTest.php
 test/Model/StatusChangeTest.php
 test/Model/SubtotalTest.php
 test/Model/TaxAmountTest.php

@@ -11,5 +11,7 @@ from clienthub.api.lookup_api import LookupApi
 from clienthub.api.orders_api import OrdersApi
 from clienthub.api.organizations_api import OrganizationsApi
 from clienthub.api.settings_api import SettingsApi
+from clienthub.api.spam_admin_api import SpamAdminApi
+from clienthub.api.spam_patterns_api import SpamPatternsApi
 from clienthub.api.webhooks_api import WebhooksApi
 

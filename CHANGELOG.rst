@@ -4,6 +4,115 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-v0-2-0:
+
+v0.2.0 — 2026-05-01 — Spam-Defense Hardening + Versioning Foundations
+======================================================================
+
+First versioned release. Going forward, every change set on master is
+tagged with a ``vX.Y.Z`` git tag and recorded under a matching heading
+here. Single source of truth lives in ``api/VERSION``; FastAPI reads
+it at startup, ``scripts/generate-sdks.sh`` stamps it into the Python
+and TypeScript SDK packages, and ``vX.Y.Z`` git tags pin release
+points for production deployments.
+
+Spam-Defense Hardening: IP plumbing, pattern misses, audit gaps
+----------------------------------------------------------------------
+
+Post-mortem on a real Hoff & Mazor cold-pitch that slipped through
+every layer (consumer-site honeypot, Cloudflare Turnstile, Client Hub
+spam filter) on Complete Dental Care prod (2026-04-30 09:46). Two
+distinct bugs and one design gap were addressed.
+
+**Bug A — Wrong IP source.** ``request.client.host`` was the docker
+bridge peer (``172.18.0.4``) at every spam-filter callsite. Caddy
+sets X-Forwarded-For by default, but uvicorn's
+``--forwarded-allow-ips=127.0.0.1`` default rejected it as
+untrusted. ``spam_rate_log.key_value`` and ``spam_events.remote_ip``
+were therefore both useless for IP forensics on both production
+VPSes.
+
+- **api/Dockerfile** — uvicorn now launches with
+  ``--proxy-headers --forwarded-allow-ips '*'``. Caddy is the only
+  ingress in every supported topology.
+- **Caddyfile** — explicit ``header_up X-Real-IP /
+  X-Forwarded-For / X-Forwarded-Proto`` so the trust chain is
+  visible at the proxy layer too.
+- **api/app/services/request_meta.py** — new
+  ``extract_request_meta(request, payload_external_refs=...)``
+  helper. Precedence: payload ``external_refs_json.ip_address``
+  (when public) > ``request.client.host`` (when public) > None.
+  Private/loopback/link-local addresses are rejected at every
+  layer, so docker bridge IPs and ``127.0.0.1`` never reach the
+  audit log.
+- **All ingest callsites updated:** ``api/app/routers/contacts.py``,
+  ``api/app/routers/communications.py``,
+  ``api/app/routers/webhooks.py``. ``CommCreate`` schema now
+  carries an optional ``external_refs_json`` field for the same
+  consumer-site IP/UA contract used by ``ContactCreate``.
+
+**Bug B — Pattern miss on B2B cold pitches.** The Hoff & Mazor body
+matched zero phrase patterns: it said "We help businesses" (not
+"I"), "10-minute chat" (not 15/30), "Best regards" (not
+"Thanks & Best Regards"), "Open to a quick chat" (not "schedule a"),
+and the email domain ``hoffandmazoor.com`` was not in any
+``email_substring`` rule. Migration **024** (``024_spam_patterns_b2b_pitch.sql``)
+adds 18 patterns hand-checked against that exact body — 12
+phrase_regex + 6 email_substring — broad enough to catch the next
+variant of the same pitch with the existing
+``PHRASE_MATCHES_REQUIRED_FOR_REJECTION = 2`` threshold (we get
+≥ 3 hits on the captured body now).
+
+**Gap C — IP rate-limit was decorative.** The rate-log wrote
+``ip`` rows but ``_is_rate_limited`` only checked ``email`` and
+``email_body_hash`` keys. The IP key was unused. Now both writes
+and reads cover all three keys, with per-key thresholds in
+``RATE_LIMIT_THRESHOLDS``: ``email=1``, ``email_body_hash=1``,
+``ip=5`` (loose enough to allow legitimate office NAT bursts).
+Migration **026** (``026_spam_rate_log_microsecond_precision.sql``)
+bumps ``occurred_at`` to ``DATETIME(6)`` so same-second submissions
+no longer collide on the ``(key_type, key_value, occurred_at)``
+PK and silently disappear via INSERT IGNORE.
+
+**Migration 025 (``025_spam_log_meta.sql``)** — adds
+``source_id`` and ``user_agent`` to ``spam_rate_log`` (per-source
+rate-limit scoping in future, plus forensics) and ``user_agent``
+to ``spam_events``. The SpamEvent ORM model gains the matching
+``user_agent`` column.
+
+**Soft-signal audit path.** When ``evaluate_intake`` returns clean
+but at least one phrase pattern grazed (below the rejection
+threshold), a ``spam_events`` row is now written with
+``rejection_reason='soft_signal'``. The submission goes through
+but operators have a queue to review near-misses. ``evaluate_intake``
+now returns a ``(verdict, soft_signal_match)`` tuple.
+
+**Backfill script — ``scripts/backfill-spam-rate-log-ip.sql``.**
+Idempotent SQL to overwrite docker-bridge IP key_values
+(``172.16.x``-``172.31.x``, ``10.x``, ``192.168.x``, ``127.0.0.1``)
+with the contemporaneous contact's ``external_refs_json.ip_address``
+when the timestamps match within ±2 seconds. Unmatched private-IP
+rows are prefixed ``unresolved:`` so the rate-limiter can never
+false-match them. Run once on each VPS after redeploying the API.
+
+**Tests — ``api/tests/test_spam_ip_capture.py`` (10 cases).**
+Unit tests for ``_is_public_ip`` and ``extract_request_meta``
+precedence, plus end-to-end tests covering payload-IP capture into
+``spam_rate_log``, private-IP rejection, IP-rate-limit bursts, and
+a verbatim Hoff & Mazor body replay that now produces HTTP 422 +
+a ``phrase_combo`` event with the correct ``remote_ip``. Full
+suite: **125 tests, all passing** (was 114; 11 net new).
+
+**Docs.** New ``IP Capture & Trust Model`` and ``Soft-Signal
+Audit Log`` sections in ``docs/Spam-Defense-Pattern.rst``;
+``Rate Limit Semantics`` rewritten to cover all three keys and
+microsecond precision.
+
+**Rollout** — local dev applied; production redeploy on CDC + CO
+will use ``./scripts/upgrade.sh`` followed by the backfill SQL.
+SDKs regenerated to expose the ``CommCreate.external_refs_json``
+field publicly.
+
 .. _client-hub-changelog-2026-04-29:
 
 2026-04-29 — Spam-Defense Framework (API-level)

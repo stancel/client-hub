@@ -262,6 +262,115 @@ etc.) plug in identically.
   enforced framework-side; foreign country-code patterns block
   obvious offshore mills
 
+.. _client-hub-todo-phase14:
+
+Phase 14 — Spam-Defense Hardening: IP plumbing + pattern misses + audit gaps [COMPLETE]
+=======================================================================================
+
+Closing three issues uncovered by a real Hoff & Mazor cold-pitch
+that landed in CDC prod on 2026-04-30. See
+``docs/Spam-Defense-Pattern.rst`` (IP Capture & Trust Model,
+Soft-Signal Audit Log) and the ``2026-05-01`` changelog entry.
+
+- [x] uvicorn ``--proxy-headers --forwarded-allow-ips '*'`` in
+  ``api/Dockerfile`` — Caddy's X-Forwarded-For is now trusted
+- [x] Caddy ``header_up`` made explicit in ``Caddyfile``
+- [x] New ``api/app/services/request_meta.py::extract_request_meta``
+  helper — payload-supplied IP wins for source-key endpoints,
+  fallback to ``request.client.host`` (private addresses dropped)
+- [x] All ingest callsites use the helper (contacts.py,
+  communications.py, webhooks.py)
+- [x] ``CommCreate`` schema gains ``external_refs_json: dict | None``
+- [x] ``IntakePayload`` carries ``user_agent``; rate-log + events
+  rows persist it for forensics
+- [x] IP-aware rate-limit via per-key thresholds in
+  ``RATE_LIMIT_THRESHOLDS`` (email=1, email_body_hash=1, ip=5)
+- [x] Migration 024 — 18 new B2B-pitch patterns covering the
+  Hoff & Mazor body and similar variants
+- [x] Migration 025 — ``source_id``/``user_agent`` columns on
+  ``spam_rate_log``; ``user_agent`` on ``spam_events``
+- [x] Migration 026 — ``spam_rate_log.occurred_at → DATETIME(6)``
+  so same-second IP rows do not collide on the PK
+- [x] Soft-signal audit path — single-phrase grazes write a
+  ``spam_events`` row with ``rejection_reason='soft_signal'``;
+  ``evaluate_intake`` now returns ``(verdict, soft_signal_match)``
+- [x] ``scripts/backfill-spam-rate-log-ip.sql`` — idempotent
+  one-shot to fix existing docker-bridge IP pollution from
+  contemporaneous contact ``external_refs_json``
+- [x] 10 new tests in ``api/tests/test_spam_ip_capture.py``;
+  full suite is 125 tests, all green; ruff clean
+- [x] Regenerate SDKs (``CommCreate.external_refs_json`` is a
+  public-API change) — bumped to v0.2.0
+- [ ] Deploy + run backfill on Complete Dental Care VPS
+- [ ] Deploy + run backfill on Clever Orchid VPS
+
+.. _client-hub-todo-phase15:
+
+Phase 15 — Versioning & Fleet Readiness Foundations [IN PROGRESS]
+======================================================================
+
+The Client Hub will eventually run as dozens — possibly hundreds —
+of single-tenant instances across different businesses. The release
+discipline put in place now must scale to that without rewrites.
+This phase covers the pieces that should be in place *long* before
+the fleet scale arrives, sequenced smallest-first.
+
+**v0.2.0 (2026-05-01) — done as part of this release:**
+
+- [x] Single source-of-truth ``api/VERSION`` file
+- [x] ``api/app/main.py`` reads VERSION at startup; FastAPI
+  ``/openapi.json`` and ``/docs`` reflect it automatically
+- [x] ``scripts/generate-sdks.sh`` stamps VERSION into Python +
+  TypeScript SDK packages (``packageVersion`` arg)
+- [x] ``scripts/generate-sdks.sh`` runs the generator container as
+  the current uid:gid — no more root-owned files, no host sudo
+- [x] First git tag: ``v0.2.0``
+- [x] CHANGELOG.rst entries now lead with ``vX.Y.Z`` headings
+  matching the git tag
+
+**Near-term (next 1-2 releases):**
+
+- [ ] ``scripts/release.sh`` — single command that bumps VERSION,
+  regenerates SDKs, runs the test suite, commits, tags, and
+  pushes (with ``--dry-run`` mode for review)
+- [ ] Pre-commit / CI guard that fails when ``CHANGELOG.rst``
+  has no entry for the current ``api/VERSION`` value
+- [ ] PR template checklist item: "Migration is forward-only +
+  idempotent (no destructive ALTERs without a soft-deprecation
+  window)"
+- [ ] Document the semver contract in
+  ``docs/Versioning-Strategy.rst``: MAJOR = breaking API change
+  (consumer SDK rebuild required); MINOR = additive endpoints /
+  fields; PATCH = bugfix only, no schema or contract change
+
+**Mid-term (when instance count > 5):**
+
+- [ ] Per-instance ``/opt/client-hub/.channel`` file with values
+  ``master`` (bleeding-edge), ``stable`` (latest ``v*`` tag), or
+  a pinned tag like ``v0.4.2``
+- [ ] ``scripts/upgrade.sh --target <ref>`` flag that ``git
+  checkout``s a specific tag/branch instead of always
+  fast-forwarding ``origin/master``
+- [ ] ``scripts/autoupgrade.sh`` (cron-driven, opt-in per VPS)
+  that polls GitHub for the channel's target ref, runs the
+  upgrade with backup + smoke-test, and rolls back on failure
+- [ ] Heartbeat / outcome reporting from each VPS to a
+  central place (Brad's local follow-up system, or a future
+  Client Hub control-plane endpoint)
+
+**Long-term (fleet scale, 10+ instances):**
+
+- [ ] Control-plane Client Hub instance with read-only access to
+  fleet ``_schema_migrations`` + heartbeats; admin UI shows
+  "29/52 instances are on v1.4.2; 23 are still on v1.3.x; 2
+  failed last upgrade"
+- [ ] SDK package publishing to PyPI / npm / Packagist (today
+  the SDKs are committed in-tree — fine for 2 instances, not for
+  hundreds)
+- [ ] Provisioning automation (Terraform / Ansible) so a new
+  instance is one command from "VPS exists" to "Client Hub
+  running with auto-upgrade enabled"
+
 .. _client-hub-todo-future:
 
 Future — Planned Work

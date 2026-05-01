@@ -382,24 +382,119 @@ makes sense (typically the email address that was rejected).
 Rate Limit Semantics
 **********************************************************************
 
-Sliding window of 10 minutes. Two key types:
+Sliding window of 10 minutes. Three key types, each with its own
+threshold (count of prior hits within the window before the next
+submission is blocked):
 
-- ``(email, occurred_at)`` — same email submitting twice within
+- ``email`` — threshold ``1``. Same email submitting twice within
   10 minutes is rate-limited.
-- ``(email||body_hash, occurred_at)`` — same email + identical body
+- ``email_body_hash`` — threshold ``1``. Same email + identical body
   hash within 10 minutes is rate-limited (catches the Sophie Lane
   double-submit pattern).
+- ``ip`` — threshold ``5``. Same client IP submitting more than five
+  times within 10 minutes is rate-limited. Higher than the email
+  threshold so a busy office NAT does not punish legitimate users.
+  Per-key thresholds live in ``RATE_LIMIT_THRESHOLDS`` in
+  ``app/services/spam_filter_service.py``.
 
 Rate-limit hits are themselves logged to ``spam_events`` with
 ``rejection_reason='rate_limit'`` and ``matched_pattern_id=NULL``
 (no pattern caused this; it's a behavioral signal).
 
-The ``spam_rate_log`` table is pruned opportunistically — every
-write deletes rows older than 1 hour, keeping it bounded.
+The ``spam_rate_log`` table uses ``DATETIME(6)`` (microsecond
+precision) on ``occurred_at`` so same-second submissions from the
+same IP do not collide on the ``(key_type, key_value, occurred_at)``
+PK and silently drop via INSERT IGNORE. It also carries
+``source_id`` and ``user_agent`` columns for per-source rate-limit
+scoping (future) and post-mortem forensics.
+
+It is pruned opportunistically — every write deletes rows older
+than 1 hour, keeping it bounded.
 
 Multi-worker safety: the table is the source of truth, so
 multiple uvicorn workers see consistent state without Redis or
 in-process coordination.
+
+.. _client-hub-sdp-ip-trust:
+
+**********************************************************************
+IP Capture & Trust Model
+**********************************************************************
+
+The spam filter records the client IP in two places:
+``spam_rate_log.key_value`` (when the ``ip`` key is recorded) and
+``spam_events.remote_ip`` (when a rejection is logged). Getting
+the *right* IP into those columns is non-trivial because of the
+deployment topology:
+
+::
+
+    visitor → Cloudflare → consumer-site Next.js → Client Hub Caddy → Client Hub API
+
+By default ``request.client.host`` in the API is the docker bridge
+peer (e.g. ``172.18.0.4``). To get the real visitor IP we use
+``app/services/request_meta.py::extract_request_meta``, which
+applies this precedence:
+
+1. ``body.external_refs_json.ip_address`` — only accepted when it
+   parses as a public IP. Consumer-site Next.js servers extract
+   the visitor IP from ``CF-Connecting-IP`` and embed it here.
+   This is the *most trustworthy* source for source-key endpoints
+   because X-Forwarded-For at our edge would only reveal the
+   consumer-site server's egress IP.
+2. ``request.client.host`` — populated by uvicorn's
+   ``--proxy-headers --forwarded-allow-ips '*'`` flags (set in
+   ``api/Dockerfile``) so X-Forwarded-For from Caddy/NPM is
+   honored. Used for traffic that does not carry a payload IP
+   (Chatwoot/InvoiceNinja webhooks, direct admin calls).
+3. ``None`` — recorded as a NULL IP / no rate-log IP key written.
+
+In both layers, addresses that are loopback, RFC 1918 private,
+link-local, or unspecified are rejected (and the helper falls
+through to the next source). This keeps docker bridge IPs and
+``127.0.0.1`` out of the audit log.
+
+**Trust caveat:** trusting payload-supplied IPs requires the
+source key itself to be trusted. If a consumer-site key leaks,
+all bets are off — that's an API-key-rotation concern, not an
+IP-capture concern.
+
+**Required deployment configuration:** the API container must
+never be exposed directly. Caddy (or Nginx Proxy Manager) is
+always the only ingress so the ``--forwarded-allow-ips '*'``
+relaxation in the Dockerfile is safe.
+
+**Adding a new ingest adapter:** any handler that builds an
+``IntakePayload`` MUST call ``extract_request_meta`` and pass the
+result into ``IntakePayload.remote_ip`` and
+``IntakePayload.user_agent``. Do not read ``request.client.host``
+directly — it bypasses the precedence rules.
+
+.. _client-hub-sdp-soft-signal:
+
+**********************************************************************
+Soft-Signal Audit Log
+**********************************************************************
+
+Phrase-combo rejection requires ≥ 2 phrase patterns to match
+(``PHRASE_MATCHES_REQUIRED_FOR_REJECTION = 2``). When exactly one
+phrase pattern matches and the payload is otherwise clean, the
+request still goes through but a ``spam_events`` row is written
+with ``rejection_reason='soft_signal'`` and the matched pattern
+attached. Operators can review this queue weekly via
+``GET /api/v1/admin/spam-events?rejection_reason=soft_signal`` and
+either:
+
+- Promote the pattern (lower the threshold or add complementary
+  patterns), turning future near-misses into hard rejections.
+- Mark the soft-signal event as a false positive
+  (``POST /api/v1/admin/spam-events/{uuid}/mark-false-positive``)
+  to bump the pattern's ``false_positive_count``.
+
+Because the request was *not* rejected, the contact / communication
+landed in primary tables alongside the soft-signal event. Cross-
+referencing by submitted email / body hash lets operators decide
+whether to delete the records in addition to tightening patterns.
 
 .. _client-hub-sdp-consumer-sync:
 

@@ -13,5 +13,6 @@ Name | Type | Description | Notes
 **order_uuid** | **string** |  | [optional]
 **external_message_id** | **string** |  | [optional]
 **created_by** | **string** |  | [optional]
+**external_refs_json** | **array<string,mixed>** |  | [optional]
 
 [[Back to Model list]](../../README.md#models) [[Back to API list]](../../README.md#endpoints) [[Back to README]](../../README.md)

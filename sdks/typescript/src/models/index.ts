@@ -24,6 +24,8 @@ export * from './Quantity';
 export * from './SettingsUpdate';
 export * from './SourceCreate';
 export * from './SourceUpdate';
+export * from './SpamPatternCreate';
+export * from './SpamPatternUpdate';
 export * from './StatusChange';
 export * from './Subtotal';
 export * from './TaxAmount';

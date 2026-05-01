@@ -19,6 +19,7 @@ from app.services.contact_service import (
     list_contacts,
     serialize_external_refs,
 )
+from app.services.request_meta import extract_request_meta
 from app.services.spam_filter_service import (
     IntakePayload,
     spam_check_or_raise,
@@ -30,7 +31,8 @@ def _extract_contact_intake(body: ContactCreate, request: Request) -> IntakePayl
 
     Pulls the first phone, first email, and synthesizes a "body" string from
     any data_source / display_name + the body of the first inline affiliation
-    note for spam evaluation. The IP comes from the request connection.
+    note for spam evaluation. IP/UA come via extract_request_meta — payload
+    external_refs (consumer-site CF-Connecting-IP) preferred over request peer.
     """
     first_phone = body.phones[0].number if body.phones else None
     first_email = body.emails[0].address if body.emails else None
@@ -47,11 +49,15 @@ def _extract_contact_intake(body: ContactCreate, request: Request) -> IntakePayl
             v = extra.get(k)
             if v:
                 synth_body_parts.append(str(v))
+    ip, ua = extract_request_meta(
+        request, payload_external_refs=body.external_refs_json
+    )
     return IntakePayload(
         email=first_email,
         phone=first_phone,
         body=" ".join(p for p in synth_body_parts if p),
-        remote_ip=(request.client.host if request.client else None),
+        remote_ip=ip,
+        user_agent=ua,
     )
 
 router = APIRouter(prefix="/contacts", tags=["contacts"], dependencies=[Depends(require_api_key)])

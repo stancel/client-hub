@@ -58,6 +58,7 @@ class SpamEvent(Base):
         nullable=False,
     )
     remote_ip: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
     submitted_email: Mapped[str | None] = mapped_column(String(255))
     submitted_phone: Mapped[str | None] = mapped_column(String(20))
     submitted_body_hash: Mapped[str | None] = mapped_column(String(16))
