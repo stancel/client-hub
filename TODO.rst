@@ -409,6 +409,19 @@ changelog entry.
   phones now E.164 (including ``(808) 256-8182`` → ``+18082568182``);
   all 17 contacts attributed to ``website``
 
+.. _client-hub-todo-phase16-v0-3-1:
+
+Phase 16 — v0.3.1 follow-ups [COMPLETE]
+----------------------------------------------------------------------
+
+- [x] Migration 028 — ``sources.domain`` backfill (CDC →
+  ``completedentalcarecolumbia.com``, CO → ``cleverorchid.com``);
+  VPS-safe, idempotent
+- [x] ``scripts/cleanup-prod-test-pollution.sql`` — body-marker-keyed
+  removal of three prod-pollution test contacts
+- [ ] Deploy v0.3.1 to CDC: run migration 028 + cleanup SQL
+- [ ] Deploy v0.3.1 to Clever Orchid: run migration 028 + cleanup SQL
+
 .. _client-hub-todo-future:
 
 Future — Planned Work

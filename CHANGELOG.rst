@@ -4,10 +4,39 @@
 Client Hub — Changelog
 ######################################################################
 
-.. _client-hub-changelog-v0-3-0:
+.. _client-hub-changelog-v0-3-1:
 
-v0.3.0 — 2026-05-01 — Phone E.164 standardization + Marketing-source attribution
-================================================================================
+v0.3.1 — 2026-05-01 — sources.domain backfill + prod test-data cleanup
+======================================================================
+
+Two small follow-ups to v0.3.0, shipped as a patch release:
+
+**``sources.domain`` was always NULL on both VPSes.** The column has
+existed since migration 014 but was never populated. Without it the
+marketing-source derivation has to fall back to a heuristic
+("any non-search/social hostname is ``website``") instead of
+authoritatively classifying same-domain referrers. Migration 028
+(``028_sources_domain_backfill.sql``) sets ``domain`` per
+``sources.code`` — ``completedentalcarecolumbia.com`` for the CDC
+row, ``cleverorchid.com`` for the CO row. The migration is keyed on
+``code`` and gated on ``domain IS NULL`` so each VPS only touches its
+own row, re-runs are no-ops, and a future client site is added by
+appending its own ``UPDATE`` in the next migration.
+
+**Three prod-pollution test contacts removed.** Brad's post-deploy
+verification on CDC ("Checking to make sure this works after fix I
+put in place.") and two pytest-era seed entries on Clever Orchid
+("Mary T TEST-FROM-CLAUDE-S5" and "Repeat", with body markers
+``TEST FROM CLAUDE`` and ``Identical body for compound rate-limit
+test``) were left in primary tables during the v0.1.0 → v0.3.0
+iteration. ``scripts/cleanup-prod-test-pollution.sql`` selects them
+by **communication-body marker** (not name, so a real customer who
+shares a first name with one of these is never at risk), previews the
+match set, then cascade-deletes through orders / invoices / payments
+/ communications / all contact-detail tables / finally the contact
+row itself. Idempotent — re-running on a clean instance is a no-op.
+
+
 
 Two issues Steven flagged after v0.2.0 went out:
 
