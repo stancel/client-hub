@@ -402,9 +402,12 @@ changelog entry.
 - [x] ``scripts/backfill-marketing-sources.sql`` — idempotent SQL
   one-shot for existing contacts
 - [x] KT handoff docs in ``docs/handoffs/`` for both consumer sites
-- [x] 174 tests, all green; ruff + rstcheck clean
-- [ ] Deploy v0.3.0 to CDC + run backfill SQL
-- [ ] Deploy v0.3.0 to Clever Orchid + run backfill SQL
+- [x] 180 tests, all green; ruff + rstcheck clean
+- [x] Deploy v0.3.0 to CDC + run backfill SQL — all 5 phones now
+  E.164; all 5 contacts attributed to ``website``
+- [x] Deploy v0.3.0 to Clever Orchid + run backfill SQL — all 17
+  phones now E.164 (including ``(808) 256-8182`` → ``+18082568182``);
+  all 17 contacts attributed to ``website``
 
 .. _client-hub-todo-future:
 
