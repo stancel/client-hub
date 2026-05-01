@@ -447,10 +447,12 @@ Phase 16 — v0.3.2 follow-ups [COMPLETE]
   template for renaming an active ``bootstrap`` row in place
 - [x] ``scripts/rename-bootstrap-clever-orchid.sql`` — committed
   CO-specific values for audit
-- [ ] Deploy v0.3.2 to CDC: drops orphan bootstrap (no rename needed
-  — CDC already has ``complete_dental_care_website``)
-- [ ] Deploy v0.3.2 to Clever Orchid: rename bootstrap →
-  ``clever_orchid_website`` via committed SQL
+- [x] Deploy v0.3.2 to CDC: orphan ``bootstrap`` dropped; only
+  ``complete_dental_care_website`` remains
+- [x] Deploy v0.3.2 to Clever Orchid: ``bootstrap`` renamed in
+  place to ``clever_orchid_website`` (id=1 unchanged, all 15
+  contacts and api_keys still resolve through the same FK); CO
+  migration 029 was correctly a no-op because the row had dependents
 
 **Source-discipline going forward:**
 
