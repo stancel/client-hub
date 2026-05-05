@@ -4,6 +4,88 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-v0-3-5:
+
+v0.3.5 — 2026-05-05 — Publish TypeScript SDK to private npm registry
+======================================================================
+
+Stand up an automated release pipeline so the Client Hub TypeScript
+SDK is consumable as a real npm package from the private Verdaccio
+registry, instead of requiring consumers to vendor a copy of the
+``sdks/typescript/`` directory or run ``npm pack`` manually.
+
+**Background.** v0.3.4 regenerated the SDKs with proper ``date`` types,
+but the generated ``sdks/typescript/package.json`` had ``name:
+"clienthub"`` and a placeholder ``repository.url``
+(``GIT_USER_ID/GIT_REPO_ID.git``), and the auto-generated README told
+consumers to run ``npm install clienthub@0.3.4 --save`` — which 404s
+because the package was never published anywhere. The two consumer
+sites (Complete Dental Care, Clever Orchid) already authenticate
+against ``https://npm.onlinesalessystems.com/`` for
+``@bradstancel/website-scheduler``; reusing the same registry +
+``.npmrc`` pattern for the SDK is zero-friction for them and matches
+existing infrastructure.
+
+**``scripts/generate-sdks.sh`` post-process for the TypeScript SDK.**
+After ``openapi-generator-cli`` writes the stock output, the script
+now uses ``jq`` to override package.json with publish-ready
+metadata:
+
+- ``name``: ``@bradstancel/clienthub-sdk``
+- ``description``: real one-liner instead of "OpenAPI client for
+  clienthub"
+- ``author``: ``Brad Stancel <brad@processfast.com>``
+- ``license``: ``UNLICENSED``
+- ``repository.url``: ``git+ssh://git@github.com/stancel/client-hub.git``
+- ``homepage``: ``https://github.com/stancel/client-hub#readme``
+- ``publishConfig``: ``{ registry:
+  https://npm.onlinesalessystems.com/, access: restricted }`` —
+  matches ``@bradstancel/website-scheduler``
+- ``files``: ``["dist", "README.md"]`` — only ship compiled output
+  and readme, not raw ``src/`` or ``tsconfig.*.json``
+- ``scripts.prepublishOnly``: ``npm run build`` — guard against
+  publishing without a fresh compile
+
+The post-process also **removes** the auto-generated ``.npmignore``
+(which was excluding ``README.md``, so previously the published
+tarball would have shipped with no readme) and **replaces** the
+auto-generated ``README.md`` with a curated version that documents
+the actual private-registry install path — the ``.npmrc`` setup,
+``NPM_TOKEN`` env var, ``npm install @bradstancel/clienthub-sdk``,
+quick-start example, versioning policy, and a pointer back to the
+Client Hub project.
+
+**Pre-flight verified.** ``npm pack --dry-run`` from the regenerated
+``sdks/typescript`` produces ``bradstancel-clienthub-sdk-0.3.5.tgz``
+(36.2 kB compressed, 202 files) containing exactly ``dist/`` (built
+output) + ``package.json`` + ``README.md``. Raw TS source,
+tsconfigs, and openapi-generator metadata are correctly excluded.
+
+**``.github/workflows/publish-sdk.yml`` (new).** Tag-triggered (``v*``)
+workflow modeled on ``@bradstancel/website-scheduler``'s
+``publish.yml``. Checks out, sets up Node 20 with the private
+registry as the publish target, installs, builds, verifies the git
+tag matches ``package.json`` version, then ``npm publish`` with
+``NODE_AUTH_TOKEN`` from the ``NPM_TOKEN`` repository secret. Runs
+in parallel with the existing ``ci.yml`` push-to-master jobs (which
+do not publish).
+
+**Operator step (one-time).** ``NPM_TOKEN`` must be configured as a
+GitHub Actions secret on the ``stancel/client-hub`` repository
+before the first tag push — the ``brad`` publisher token (per
+``~/docker/verdaccio/CLAUDE.md``'s scope policy: ``@bradstancel/*``
+publish is gated on the ``brad`` user, not ``consumer``).
+
+**Why publish v0.3.5 as the first release rather than backfilling
+v0.3.4.** Cleaner — Verdaccio gets only versions cut after the
+pipeline existed, no ambiguity about provenance. v0.3.4 remains the
+last "vendor-only" release; consumer sites that need it can still
+clone the v0.3.4 tag.
+
+**Tests:** all 180 existing tests pass; ruff + rstcheck clean. No
+runtime behavior changes — this is purely a packaging/distribution
+change.
+
 .. _client-hub-changelog-v0-3-4:
 
 v0.3.4 — 2026-05-05 — ORM date type alignment

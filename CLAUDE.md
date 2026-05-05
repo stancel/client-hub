@@ -10,7 +10,7 @@
 - **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
-- **Version:** 0.3.4 (single source of truth: `api/VERSION`; FastAPI
+- **Version:** 0.3.5 (single source of truth: `api/VERSION`; FastAPI
   reads it at startup; SDKs stamped via `scripts/generate-sdks.sh`;
   git tagged `vX.Y.Z`)
 - **Schema:** 39 tables + 3 views in `clienthub` (3NF; through

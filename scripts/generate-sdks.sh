@@ -85,6 +85,102 @@ fi
 
 if [[ "$LANGUAGE" == "all" || "$LANGUAGE" == "typescript" ]]; then
     generate_sdk "typescript" "typescript-fetch" "--additional-properties=npmName=clienthub,supportsES6=true"
+
+    # Post-process the generated TypeScript SDK so it can be published
+    # to the private @bradstancel registry as a real npm package.
+    # The openapi-generator template ships a stock package.json with
+    # placeholder repo URL and an .npmignore that excludes README.md;
+    # we override both, and replace the misleading auto-generated
+    # README with one pointing at the actual private registry.
+    ts_dir="$SDK_DIR/typescript"
+
+    jq '. + {
+        name: "@bradstancel/clienthub-sdk",
+        description: "TypeScript SDK for the Client Hub data-first customer intelligence API. Auto-generated from the OpenAPI spec on every release; do not edit by hand.",
+        author: "Brad Stancel <brad@processfast.com>",
+        license: "UNLICENSED",
+        repository: {
+            type: "git",
+            url: "git+ssh://git@github.com/stancel/client-hub.git"
+        },
+        homepage: "https://github.com/stancel/client-hub#readme",
+        publishConfig: {
+            registry: "https://npm.onlinesalessystems.com/",
+            access: "restricted"
+        },
+        files: ["dist", "README.md"],
+        scripts: (.scripts + {prepublishOnly: "npm run build"})
+    }' "$ts_dir/package.json" > "$ts_dir/package.json.tmp"
+    mv "$ts_dir/package.json.tmp" "$ts_dir/package.json"
+
+    # Stock .npmignore excludes README.md — wipe it so npm uses the
+    # `files` allowlist from package.json instead.
+    rm -f "$ts_dir/.npmignore"
+
+    cat > "$ts_dir/README.md" <<'README_EOF'
+# @bradstancel/clienthub-sdk
+
+TypeScript SDK for the [Client Hub](https://github.com/stancel/client-hub)
+data-first customer intelligence API.
+
+> Auto-generated from the OpenAPI spec on every Client Hub release.
+> **Do not edit by hand** — changes are clobbered on the next
+> `./scripts/generate-sdks.sh` run.
+
+## Install
+
+The package is published to a private registry
+(`https://npm.onlinesalessystems.com/`) under the `@bradstancel`
+scope. Configure your project's `.npmrc` once:
+
+```
+@bradstancel:registry=https://npm.onlinesalessystems.com/
+//npm.onlinesalessystems.com/:_authToken=${NPM_TOKEN}
+```
+
+Set `NPM_TOKEN` in your environment (the read-only `consumer` token
+is sufficient for installs). Then:
+
+```bash
+npm install @bradstancel/clienthub-sdk
+```
+
+## Versioning
+
+The SDK version always matches the Client Hub API version it was
+generated against. `^0.3.5` will pull the latest `0.3.x` patch
+release. Every Client Hub release tags `vX.Y.Z` in git and publishes
+that exact version here via GitHub Actions.
+
+## Quick start
+
+```typescript
+import { Configuration, ContactsApi } from '@bradstancel/clienthub-sdk';
+
+const config = new Configuration({
+  basePath: 'https://your-clienthub-instance.example.com',
+  headers: { 'X-API-Key': process.env.CLIENT_HUB_API_KEY! },
+});
+
+const contacts = new ContactsApi(config);
+const result = await contacts.listContacts();
+```
+
+See your Client Hub instance's `/docs` URL for the full endpoint
+surface (Swagger UI auto-generated from the same spec this SDK was
+built from).
+
+## Source
+
+- Project: <https://github.com/stancel/client-hub>
+- Generator: `openapitools/openapi-generator-cli` (`typescript-fetch`)
+- Spec source: `sdks/openapi.json` in the Client Hub repo
+README_EOF
+
+    echo "  Patched: $ts_dir/package.json (name, repo, publishConfig)"
+    echo "  Removed: $ts_dir/.npmignore (was excluding README.md)"
+    echo "  Wrote:   $ts_dir/README.md (private-registry install instructions)"
+    echo ""
 fi
 
 echo "=== Done ==="

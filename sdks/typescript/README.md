@@ -1,46 +1,57 @@
-## clienthub@0.3.4
+# @bradstancel/clienthub-sdk
 
-This generator creates TypeScript/JavaScript client that utilizes [Fetch API](https://fetch.spec.whatwg.org/). The generated Node module can be used in the following environments:
+TypeScript SDK for the [Client Hub](https://github.com/stancel/client-hub)
+data-first customer intelligence API.
 
-Environment
-* Node.js
-* Webpack
-* Browserify
+> Auto-generated from the OpenAPI spec on every Client Hub release.
+> **Do not edit by hand** — changes are clobbered on the next
+> `./scripts/generate-sdks.sh` run.
 
-Language level
-* ES5 - you must have a Promises/A+ library installed
-* ES6
+## Install
 
-Module system
-* CommonJS
-* ES6 module system
-
-It can be used in both TypeScript and JavaScript. In TypeScript, the definition will be automatically resolved via `package.json`. ([Reference](https://www.typescriptlang.org/docs/handbook/declaration-files/consumption.html))
-
-### Building
-
-To build and compile the typescript sources to javascript use:
-```
-npm install
-npm run build
-```
-
-### Publishing
-
-First build the package then run `npm publish`
-
-### Consuming
-
-navigate to the folder of your consuming project and run one of the following commands.
-
-_published:_
+The package is published to a private registry
+(`https://npm.onlinesalessystems.com/`) under the `@bradstancel`
+scope. Configure your project's `.npmrc` once:
 
 ```
-npm install clienthub@0.3.4 --save
+@bradstancel:registry=https://npm.onlinesalessystems.com/
+//npm.onlinesalessystems.com/:_authToken=${NPM_TOKEN}
 ```
 
-_unPublished (not recommended):_
+Set `NPM_TOKEN` in your environment (the read-only `consumer` token
+is sufficient for installs). Then:
 
+```bash
+npm install @bradstancel/clienthub-sdk
 ```
-npm install PATH_TO_GENERATED_PACKAGE --save
+
+## Versioning
+
+The SDK version always matches the Client Hub API version it was
+generated against. `^0.3.5` will pull the latest `0.3.x` patch
+release. Every Client Hub release tags `vX.Y.Z` in git and publishes
+that exact version here via GitHub Actions.
+
+## Quick start
+
+```typescript
+import { Configuration, ContactsApi } from '@bradstancel/clienthub-sdk';
+
+const config = new Configuration({
+  basePath: 'https://your-clienthub-instance.example.com',
+  headers: { 'X-API-Key': process.env.CLIENT_HUB_API_KEY! },
+});
+
+const contacts = new ContactsApi(config);
+const result = await contacts.listContacts();
 ```
+
+See your Client Hub instance's `/docs` URL for the full endpoint
+surface (Swagger UI auto-generated from the same spec this SDK was
+built from).
+
+## Source
+
+- Project: <https://github.com/stancel/client-hub>
+- Generator: `openapitools/openapi-generator-cli` (`typescript-fetch`)
+- Spec source: `sdks/openapi.json` in the Client Hub repo
