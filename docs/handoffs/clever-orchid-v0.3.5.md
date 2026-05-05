@@ -1,0 +1,143 @@
+# Client Hub v0.3.5 — Knowledge Transfer for Clever Orchid Website
+
+**Audience:** the Claude Code session (or developer) working on the
+**Clever Orchid Next.js consumer site** — the one that submits
+contact-form and booking-form data to
+`https://client-hub-clever-orchid.onlinesalessystems.com`.
+
+**Status:** Client Hub v0.3.5 is **already deployed** to the API
+(commit `9f91edd`, deployed 2026-05-05) and the TypeScript SDK is
+**published** to the private npm registry as
+`@bradstancel/clienthub-sdk@0.3.5`. The wire format is unchanged
+from v0.3.3; nothing on the consumer site has to change today for
+existing flows to keep working.
+
+## TL;DR
+
+- The TypeScript SDK is now a real npm package on
+  `https://npm.onlinesalessystems.com/` — same registry the site
+  already uses for `@bradstancel/website-scheduler`. Your existing
+  `.npmrc` should already authorize the install.
+- v0.3.5 bundles the v0.3.4 ORM/date-typing fix: five date-only
+  fields (`order_date`, `due_date` × 2, `invoice_date`,
+  `payment_date`) are now typed as `Date` in the SDK instead of
+  `string`. **If you don't call any of the order / invoice / payment
+  endpoints, this is a no-op for you.**
+- Recommended flow: install + test locally, then commit, then
+  follow your normal git-pull-and-deploy on the VPS — same pattern
+  documented in your project's CLAUDE.md.
+
+## Install / upgrade
+
+If you don't already have the SDK installed:
+
+```bash
+npm install @bradstancel/clienthub-sdk@^0.3.5
+```
+
+If you already have an older vendored copy under `lib/clienthub-sdk/`
+or similar, **delete it first**, then run the install above so npm
+becomes the source of truth instead of a hand-copied directory.
+
+Your project's existing `.npmrc` should already point
+`@bradstancel:registry=https://npm.onlinesalessystems.com/` and
+provide an `NPM_TOKEN` env var — that's the same setup that resolves
+`@bradstancel/website-scheduler`. If install fails with a 401 / 403,
+verify `.npmrc` and `NPM_TOKEN` are both present and the token is
+the read-only `consumer` token (not a personal one).
+
+## Local pre-flight checks
+
+Before committing, run a quick grep to find any code paths that
+touch the date-typed fields whose TS type just tightened:
+
+```bash
+grep -rE "(order_date|invoice_date|due_date|payment_date)" \
+  --include='*.ts' --include='*.tsx' src/
+```
+
+If the grep returns hits in TypeScript files, those call sites may
+need adjusting:
+
+- **Was**: passing a raw ISO string (`"2026-05-05"`) into the SDK
+- **Now**: pass a `Date` object (`new Date("2026-05-05")` or
+  `new Date()`) — Pydantic on the server still accepts ISO strings
+  on the wire, but the TS types now require `Date` at the call site
+
+If the grep returns no hits — most likely outcome for the Clever
+Orchid site, which submits to `/api/v1/contacts` and doesn't touch
+the order / invoice / payment endpoints — you're done with code
+changes.
+
+Then run the standard local test suite documented in your project's
+CLAUDE.md / README to confirm:
+
+- TypeScript compiles cleanly: `npm run typecheck` (or `tsc --noEmit`)
+- Unit tests pass: `npm test`
+- Local dev build succeeds: `npm run build`
+- The contact / booking forms still POST successfully against the
+  live API or your local mock
+
+## Commit + deploy flow
+
+Once local tests pass:
+
+1. Commit the changes in the consumer-site repo.
+   Typical surface: `package.json`, `package-lock.json`, and any TS
+   call-site adjustments from the grep step.
+   Suggested message: `chore: bump @bradstancel/clienthub-sdk to ^0.3.5`
+2. Push to the consumer-site repo's default branch.
+3. On the production VPS, follow your standard deploy procedure
+   documented in the consumer-site project's CLAUDE.md — typically:
+   `git pull`, `npm ci` (which respects the lockfile so the same
+   SDK version installs), rebuild the Next.js bundle, restart /
+   reload the service.
+4. Verify the live site still submits contact / booking forms
+   correctly and the API receives them (spot-check the Client Hub
+   admin events endpoint or the `contacts` table on
+   `client-hub-clever-orchid.onlinesalessystems.com`).
+
+## Verification
+
+Confirm the SDK version your build resolved:
+
+```bash
+npm ls @bradstancel/clienthub-sdk
+# expected: @bradstancel/clienthub-sdk@0.3.5
+```
+
+Confirm the API the site is talking to is on the matching version:
+
+```bash
+curl -sf https://client-hub-clever-orchid.onlinesalessystems.com/openapi.json \
+  | jq -r '.info.version'
+# expected: 0.3.4 or 0.3.5 — both produce the same API surface for
+# the SDK; v0.3.5 was a packaging-only change to the project itself
+```
+
+## Reference
+
+Inside the consumer-site repo:
+
+- `package.json` / `package-lock.json` — the dep
+- `.npmrc` — registry + auth setup (should already exist)
+- The site's CLAUDE.md / README for the canonical deploy procedure
+
+Inside the Client Hub project (`~/docker/client-hub` on Cybertron):
+
+- `CHANGELOG.rst` `v0.3.5` entry — full release notes
+- `sdks/typescript/` — the source the published package is built
+  from (regenerated by `scripts/generate-sdks.sh` on every release)
+- `.github/workflows/publish-sdk.yml` — the tag-triggered publish
+  pipeline that put `@bradstancel/clienthub-sdk` on Verdaccio
+- `~/docker/verdaccio/CLAUDE.md` — the registry itself, scope
+  policy, user roles
+
+## Questions or anything unclear
+
+The Client Hub project is the source of truth — see the `v0.3.5`
+entry in `~/docker/client-hub/CHANGELOG.rst` and the live OpenAPI
+spec at
+`https://client-hub-clever-orchid.onlinesalessystems.com/openapi.json`.
+For SDK install issues, the Verdaccio admin docs are at
+`~/docker/verdaccio/CLAUDE.md`.
