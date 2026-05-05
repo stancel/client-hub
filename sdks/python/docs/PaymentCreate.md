@@ -6,7 +6,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **amount** | [**Amount**](Amount.md) |  | 
-**payment_date** | **str** |  | 
+**payment_date** | **date** |  | 
 **payment_method** | **str** |  | [optional] [default to 'online']
 **reference_number** | **str** |  | [optional] 
 **external_payment_id** | **str** |  | [optional] 

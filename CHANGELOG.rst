@@ -4,6 +4,51 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-v0-3-4:
+
+v0.3.4 — 2026-05-05 — ORM date type alignment
+======================================================================
+
+Fix a long-standing drift between the SQLAlchemy ORM models and the
+actual MariaDB schema for the four date-only columns. The DDL has
+always declared ``DATE`` (see migrations 008 and 009), but the
+ORM models declared them as ``Mapped[str]`` / ``String(10)``,
+which led readers (and EER-export tools) to believe the storage
+type was ``VARCHAR(10)``. MariaDB has been silently coercing the
+``YYYY-MM-DD`` strings the ORM handed it because they were valid
+date literals, so no data is affected — this is a typing fix only.
+
+**Models now match the live DDL.** The five affected columns are
+typed as ``Mapped[date] = mapped_column(Date, ...)``:
+
+- ``orders.order_date`` (``api/app/models/order.py``)
+- ``orders.due_date``
+- ``invoices.invoice_date`` (``api/app/models/invoice.py``)
+- ``invoices.due_date``
+- ``payments.payment_date``
+
+**Pydantic request bodies and response schemas updated to match.**
+``OrderCreate.order_date`` / ``due_date``, ``InvoiceCreate.invoice_date``
+/ ``due_date``, ``PaymentCreate.payment_date``,
+``RecentOrderOut.order_date``, and ``ContactSummary.last_order_date``
+now declare ``date`` (and ``date | None`` where appropriate) instead
+of ``str``. OpenAPI now reports ``"format": "date"`` on these fields,
+which propagates into the regenerated SDK types.
+
+**Wire format unchanged.** Pydantic v2 still accepts ISO date
+strings on input and serializes ``date`` objects as ISO strings on
+output, so existing API consumers see no breaking change. Strictly
+malformed strings (e.g. ``"not-a-date"``) are now rejected at the
+Pydantic boundary instead of being silently passed to MariaDB.
+
+**Webhook payment-date construction.** The InvoiceNinja webhook
+that records payments now passes ``datetime.now(timezone.utc).date()``
+to the SQLAlchemy ``Date`` column instead of a pre-formatted string.
+
+**Tests:** all 180 existing tests pass unchanged — they were already
+sending ISO date strings, which Pydantic v2 coerces to ``date``
+objects.
+
 .. _client-hub-changelog-v0-3-3:
 
 v0.3.3 — 2026-05-01 — Source discipline + business_settings + data-model docs

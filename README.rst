@@ -114,7 +114,7 @@ Quick Info
    * - **DB Name**
      - ``clienthub``
    * - **Version**
-     - 0.3.3 (single source of truth: ``api/VERSION``;
+     - 0.3.4 (single source of truth: ``api/VERSION``;
        git-tagged ``vX.Y.Z`` per release)
    * - **Schema**
      - 39 tables + 3 views (3NF normalized; through migration 029)

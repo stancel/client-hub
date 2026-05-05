@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -51,7 +51,7 @@ class RecentOrderOut(BaseModel):
     order_number: str | None
     status: str
     total: Decimal
-    order_date: str
+    order_date: date
 
     model_config = {"from_attributes": True}
 
@@ -199,7 +199,7 @@ class ContactSummaryOut(BaseModel):
     primary_email: str | None
     total_orders: int
     lifetime_value: Decimal
-    last_order_date: str | None
+    last_order_date: date | None
     total_communications: int
     last_communication_at: datetime | None
     outstanding_balance: Decimal

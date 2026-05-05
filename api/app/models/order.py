@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.lookups import Base
@@ -15,8 +15,8 @@ class Order(Base):
     contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id"))
     order_status_id: Mapped[int] = mapped_column(ForeignKey("order_statuses.id"))
     order_number: Mapped[str | None] = mapped_column(String(50), unique=True)
-    order_date: Mapped[str] = mapped_column(String(10), nullable=False)
-    due_date: Mapped[str | None] = mapped_column(String(10))
+    order_date: Mapped[date] = mapped_column(Date, nullable=False)
+    due_date: Mapped[date | None] = mapped_column(Date)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
     discount_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))

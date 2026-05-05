@@ -1,5 +1,5 @@
 import uuid as uuid_mod
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -28,8 +28,8 @@ class OrderItemCreate(BaseModel):
 
 class OrderCreate(BaseModel):
     contact_uuid: str
-    order_date: str
-    due_date: str | None = None
+    order_date: date
+    due_date: date | None = None
     scheduled_at: str | None = None
     items: list[OrderItemCreate] = []
     notes_text: str | None = None

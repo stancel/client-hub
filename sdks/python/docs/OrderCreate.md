@@ -6,8 +6,8 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **contact_uuid** | **str** |  | 
-**order_date** | **str** |  | 
-**due_date** | **str** |  | [optional] 
+**order_date** | **date** |  | 
+**due_date** | **date** |  | [optional] 
 **scheduled_at** | **str** |  | [optional] 
 **items** | [**List[OrderItemCreate]**](OrderItemCreate.md) |  | [optional] [default to []]
 **notes_text** | **str** |  | [optional] 

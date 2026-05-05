@@ -5,8 +5,8 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **order_uuid** | **string** |  |
-**invoice_date** | **string** |  |
-**due_date** | **string** |  | [optional]
+**invoice_date** | **\DateTime** |  |
+**due_date** | **\DateTime** |  | [optional]
 **subtotal** | [**\ClientHub\Model\Subtotal**](Subtotal.md) |  |
 **tax_amount** | [**\ClientHub\Model\TaxAmount**](TaxAmount.md) |  | [optional]
 

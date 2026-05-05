@@ -5,8 +5,8 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **contact_uuid** | **string** |  |
-**order_date** | **string** |  |
-**due_date** | **string** |  | [optional]
+**order_date** | **\DateTime** |  |
+**due_date** | **\DateTime** |  | [optional]
 **scheduled_at** | **string** |  | [optional]
 **items** | [**\ClientHub\Model\OrderItemCreate[]**](OrderItemCreate.md) |  | [optional]
 **notes_text** | **string** |  | [optional]

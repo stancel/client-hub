@@ -6,8 +6,8 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **order_uuid** | **str** |  | 
-**invoice_date** | **str** |  | 
-**due_date** | **str** |  | [optional] 
+**invoice_date** | **date** |  | 
+**due_date** | **date** |  | [optional] 
 **subtotal** | [**Subtotal**](Subtotal.md) |  | 
 **tax_amount** | [**TaxAmount**](TaxAmount.md) |  | [optional] 
 

@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.lookups import Base
@@ -15,8 +15,8 @@ class Invoice(Base):
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
     invoice_status_id: Mapped[int] = mapped_column(ForeignKey("invoice_statuses.id"))
     invoice_number: Mapped[str | None] = mapped_column(String(50), unique=True)
-    invoice_date: Mapped[str] = mapped_column(String(10), nullable=False)
-    due_date: Mapped[str | None] = mapped_column(String(10))
+    invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
+    due_date: Mapped[date | None] = mapped_column(Date)
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
     tax_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))
@@ -42,7 +42,7 @@ class Payment(Base):
     invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"))
     payment_method_id: Mapped[int] = mapped_column(ForeignKey("payment_methods.id"))
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    payment_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    payment_date: Mapped[date] = mapped_column(Date, nullable=False)
     reference_number: Mapped[str | None] = mapped_column(String(255))
     external_payment_id: Mapped[str | None] = mapped_column(String(255))
     notes_text: Mapped[str | None] = mapped_column(Text)

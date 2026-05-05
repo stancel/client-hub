@@ -1,4 +1,5 @@
 import uuid as uuid_mod
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,15 +19,15 @@ router = APIRouter(prefix="/invoices", tags=["invoices"], dependencies=[Depends(
 
 class InvoiceCreate(BaseModel):
     order_uuid: str
-    invoice_date: str
-    due_date: str | None = None
+    invoice_date: date
+    due_date: date | None = None
     subtotal: Decimal
     tax_amount: Decimal = Decimal("0.00")
 
 
 class PaymentCreate(BaseModel):
     amount: Decimal
-    payment_date: str
+    payment_date: date
     payment_method: str = "online"
     reference_number: str | None = None
     external_payment_id: str | None = None

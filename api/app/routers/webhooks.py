@@ -41,7 +41,7 @@ async def invoiceninja_webhook(request: Request, db: AsyncSession = Depends(get_
                 amount = Decimal(str(data.get("amount", 0)))
                 payment = Payment(
                     uuid=str(uuid_mod.uuid4()), invoice_id=inv.id, payment_method_id=method.id,
-                    amount=amount, payment_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    amount=amount, payment_date=datetime.now(timezone.utc).date(),
                     external_payment_id=data.get("payment_id"),
                 )
                 db.add(payment)
