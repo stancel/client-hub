@@ -12,8 +12,20 @@ Overview
 
 This guide explains how to integrate any Next.js "Web Factory" site
 with Client Hub. The integration is designed to be copy-paste
-portable — drop in the reference module, set three env vars, and
-start pushing events.
+portable — install the SDK package, set three env vars, drop in
+the reference module, and start pushing events.
+
+The canonical integration path is the **published TypeScript SDK**:
+``@bradstancel/clienthub-sdk`` on the private npm registry at
+``https://npm.onlinesalessystems.com/`` — same registry every
+Web Factory site already uses for ``@bradstancel/website-scheduler``.
+Both production consumer sites (Complete Dental Care and Clever
+Orchid) are on this pattern as of v0.3.5 (2026-05-05). The hand-rolled
+``fetch()`` pattern that earlier versions of this guide recommended
+is **deprecated** — new sites should always start from the SDK; sites
+still on the old pattern should migrate (see CDC's commit ``0b46c9e``
+or Clever Orchid's ``6524034`` for worked examples in the
+consumer-site repos).
 
 .. _client-hub-cp-env-vars:
 
@@ -28,6 +40,44 @@ Add to your Next.js site's ``.env.local``:
    CLIENTHUB_URL=https://client-hub.example.com
    CLIENTHUB_API_KEY=your_source_scoped_api_key_here
    CLIENTHUB_SOURCE_CODE=my_website
+   NPM_TOKEN=<consumer-token>          # for `npm install` only
+
+The first three are runtime env vars consumed by ``lib/client-hub.ts``
+at request time. ``NPM_TOKEN`` is **install-time only** — it lets
+``npm install`` resolve packages from the private registry. It does
+not need to be present in the runtime environment of the Next.js
+server.
+
+.. _client-hub-cp-install:
+
+**********************************************************************
+Installing the SDK
+**********************************************************************
+
+Configure your project's ``.npmrc`` once (the same file that already
+authorizes ``@bradstancel/website-scheduler``):
+
+.. code-block:: text
+
+   @bradstancel:registry=https://npm.onlinesalessystems.com/
+   //npm.onlinesalessystems.com/:_authToken=${NPM_TOKEN}
+
+Set ``NPM_TOKEN`` to the read-only ``consumer`` token (per
+``~/docker/verdaccio/CLAUDE.md``'s scope policy — the publisher
+``brad`` token is only used by the Client Hub repo's CI publish
+workflow, never by consumer sites). Then:
+
+.. code-block:: bash
+
+   npm install @bradstancel/clienthub-sdk@^0.3.5
+
+The ``^0.3.5`` range pulls the latest 0.3.x patch on every fresh
+``npm install`` / ``npm ci``; major-version bumps (0.4.x and beyond)
+are opt-in and require an explicit version change in
+``package.json``. Every Client Hub release publishes the matching
+SDK version automatically via the tag-triggered
+``.github/workflows/publish-sdk.yml`` workflow in the Client Hub
+repo.
 
 .. _client-hub-cp-event-codes:
 
@@ -67,19 +117,44 @@ Every Web Factory site uses these canonical ``channel_types`` codes:
 .. _client-hub-cp-reference-module:
 
 **********************************************************************
-Reference Module: lib/client-hub.ts
+Reference Module: lib/client-hub.ts (SDK-based)
 **********************************************************************
 
-Drop this file into your Next.js project at ``lib/client-hub.ts``:
+Drop this file into your Next.js project at ``lib/client-hub.ts``.
+Modeled on the actual production cutover at CDC (commit ``0b46c9e``)
+and Clever Orchid (commit ``6524034``). The public surface
+(``logConversion``, ``logConversionBackground``,
+``appendCommunication``, ``appendCommunicationBackground``,
+``ConversionEvent``, ``LogConversionInput``,
+``AppendCommunicationInput``) is the same as the legacy
+hand-rolled module so call sites do not change when migrating.
 
 .. code-block:: typescript
 
    // lib/client-hub.ts
-   // Send conversion events to Client Hub. Error-swallowing — never crashes caller.
+   // Send conversion events to Client Hub via @bradstancel/clienthub-sdk.
+   // Error-swallowing — never crashes caller.
 
-   const CLIENTHUB_URL = process.env.CLIENTHUB_URL || "https://client-hub.example.com";
-   const CLIENTHUB_API_KEY = process.env.CLIENTHUB_API_KEY || "";
+   import {
+     Configuration,
+     ContactsApi,
+     CommunicationsApi,
+     LookupApi,
+     ResponseError,
+   } from "@bradstancel/clienthub-sdk";
+
    const TIMEOUT_MS = 3000;
+
+   const config = new Configuration({
+     basePath: process.env.CLIENTHUB_URL ?? "https://client-hub.example.com",
+     // Function form so the env var is read on every request, not at
+     // module-load time. Important for Next.js dev/HMR and edge cases.
+     apiKey: () => process.env.CLIENTHUB_API_KEY ?? "",
+   });
+
+   const contacts = new ContactsApi(config);
+   const communications = new CommunicationsApi(config);
+   const lookups = new LookupApi(config);
 
    export type ConversionEvent =
      | "web_form"
@@ -102,6 +177,7 @@ Drop this file into your Next.js project at ``lib/client-hub.ts``:
      subject?: string;
      body?: string;
      sourcePage?: string;
+     siteSourceCode?: string;
      referrer?: string;
      userAgent?: string;
      ipAddress?: string;
@@ -116,79 +192,156 @@ Drop this file into your Next.js project at ``lib/client-hub.ts``:
      extra?: Record<string, unknown>;
    }
 
+   export interface AppendCommunicationInput {
+     event: ConversionEvent;
+     email: string; // required — used to look up the existing contact
+     subject?: string;
+     body?: string;
+   }
+
+   function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+     const controller = new AbortController();
+     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+     return fn(controller.signal).finally(() => clearTimeout(timer));
+   }
+
+   async function readErrorBody(err: unknown): Promise<string> {
+     if (err instanceof ResponseError) {
+       const status = err.response.status;
+       try {
+         const text = await err.response.text();
+         return `${status} ${text}`;
+       } catch {
+         return `${status} <body unreadable>`;
+       }
+     }
+     return String(err);
+   }
+
+   /**
+    * Create / upsert a contact and log a communication row in one shot.
+    * Use for first-time events (web_form, booking.created).
+    */
    export async function logConversion(input: LogConversionInput): Promise<void> {
-     if (!CLIENTHUB_API_KEY) {
+     if (!process.env.CLIENTHUB_API_KEY) {
        console.warn("[client-hub] CLIENTHUB_API_KEY not set; skipping");
        return;
      }
 
-     const occurredAt = new Date().toISOString();
-     const externalRefs = {
-       source_page: input.sourcePage,
-       referrer: input.referrer,
-       user_agent: input.userAgent,
-       ip_address: input.ipAddress,
-       gtm_client_id: input.gtmClientId,
-       utm: input.utm,
-       extra: input.extra,
-     };
+     await withTimeout(async (signal) => {
+       try {
+         const contact = await contacts.createContactEndpointApiV1ContactsPost(
+           {
+             contactCreate: {
+               contactType: "lead",
+               firstName: input.firstName ?? "",
+               lastName: input.lastName ?? "",
+               emails: input.email
+                 ? [{ address: input.email, isPrimary: true }]
+                 : [],
+               phones: input.phone
+                 ? [{ number: input.phone, isPrimary: true }]
+                 : [],
+               externalRefsJson: {
+                 source_page: input.sourcePage,
+                 site_source_code:
+                   input.siteSourceCode ?? process.env.CLIENTHUB_SOURCE_CODE,
+                 referrer: input.referrer,
+                 user_agent: input.userAgent,
+                 ip_address: input.ipAddress,
+                 gtm_client_id: input.gtmClientId,
+                 utm: input.utm,
+                 extra: input.extra,
+               },
+             },
+           },
+           { signal }, // SDK runtime spreads initOverrides into RequestInit
+         );
 
-     const controller = new AbortController();
-     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-     try {
-       // 1. Create / upsert contact
-       const contactRes = await fetch(`${CLIENTHUB_URL}/api/v1/contacts`, {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-           "X-API-Key": CLIENTHUB_API_KEY,
-         },
-         body: JSON.stringify({
-           contact_type: "lead",
-           first_name: input.firstName ?? "",
-           last_name: input.lastName ?? "",
-           emails: input.email ? [{ address: input.email, is_primary: true }] : [],
-           phones: input.phone ? [{ number: input.phone, is_primary: true }] : [],
-           external_refs_json: externalRefs,
-         }),
-         signal: controller.signal,
-       });
-
-       if (!contactRes.ok) {
-         console.warn(`[client-hub] contact create failed: ${contactRes.status}`);
-         return;
+         await communications.createCommunicationApiV1CommunicationsPost(
+           {
+             commCreate: {
+               contactUuid: contact.uuid,
+               channel: input.event,
+               direction: "inbound",
+               occurredAt: new Date().toISOString(),
+               subject: input.subject,
+               body: input.body,
+             },
+           },
+           { signal },
+         );
+       } catch (err) {
+         console.warn(
+           `[client-hub] logConversion failed: ${await readErrorBody(err)}`,
+         );
        }
+     });
+   }
 
-       const contact = (await contactRes.json()) as { uuid: string };
-
-       // 2. Log the event
-       await fetch(`${CLIENTHUB_URL}/api/v1/communications`, {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-           "X-API-Key": CLIENTHUB_API_KEY,
-         },
-         body: JSON.stringify({
-           contact_uuid: contact.uuid,
-           channel: input.event,
-           direction: "inbound",
-           occurred_at: occurredAt,
-           subject: input.subject,
-           body: input.body,
-         }),
-         signal: controller.signal,
-       });
-     } catch (err) {
-       console.warn("[client-hub] event failed:", err);
-     } finally {
-       clearTimeout(timeoutId);
+   /**
+    * Append a communication row to an EXISTING contact (looked up by
+    * email). Use for follow-up events (booking.cancelled) so the rich
+    * create-time external_refs_json on the contact row is not clobbered.
+    * See "Don't shadow — merge" below for the full contract.
+    */
+   export async function appendCommunication(
+     input: AppendCommunicationInput,
+   ): Promise<void> {
+     if (!process.env.CLIENTHUB_API_KEY) {
+       console.warn("[client-hub] CLIENTHUB_API_KEY not set; skipping");
+       return;
      }
+
+     await withTimeout(async (signal) => {
+       try {
+         // LookupApi response is currently typed as `any` server-side
+         // (no response_model on the FastAPI route); cast to the known
+         // shape. Tracked as a v0.3.6+ TODO on the Client Hub project.
+         const result = (await lookups.lookupEmailApiV1LookupEmailEmailGet(
+           { email: input.email },
+           { signal },
+         )) as { matches?: Array<{ uuid: string }> };
+
+         const matches = result.matches ?? [];
+         if (!matches.length) {
+           console.warn(
+             `[client-hub] appendCommunication: no contact for ${input.email}`,
+           );
+           return;
+         }
+
+         await communications.createCommunicationApiV1CommunicationsPost(
+           {
+             commCreate: {
+               contactUuid: matches[0].uuid,
+               channel: input.event,
+               direction: "inbound",
+               occurredAt: new Date().toISOString(),
+               subject: input.subject,
+               body: input.body,
+             },
+           },
+           { signal },
+         );
+       } catch (err) {
+         console.warn(
+           `[client-hub] appendCommunication failed: ${await readErrorBody(err)}`,
+         );
+       }
+     });
    }
 
    /** Fire-and-forget version — does not await. */
    export function logConversionBackground(input: LogConversionInput): void {
      logConversion(input).catch(() => {});
+   }
+
+   /** Fire-and-forget version — does not await. */
+   export function appendCommunicationBackground(
+     input: AppendCommunicationInput,
+   ): void {
+     appendCommunication(input).catch(() => {});
    }
 
 .. _client-hub-cp-usage:
@@ -197,10 +350,13 @@ Drop this file into your Next.js project at ``lib/client-hub.ts``:
 Usage Example (Next.js API Route)
 **********************************************************************
 
+Call sites are unchanged from the legacy module — that's the whole
+point of preserving the public surface above.
+
 .. code-block:: typescript
 
    // app/api/contact/route.ts
-   import { logConversion } from "@/lib/client-hub";
+   import { logConversionBackground } from "@/lib/client-hub";
    import { headers } from "next/headers";
 
    export async function POST(request: Request) {
@@ -210,8 +366,8 @@ Usage Example (Next.js API Route)
      // Your existing form handling...
      // sendEmail(body);
 
-     // Push to Client Hub (fire-and-forget)
-     logConversion({
+     // Push to Client Hub (fire-and-forget — never blocks the response)
+     logConversionBackground({
        event: "web_form",
        email: body.email,
        phone: body.phone,
@@ -222,10 +378,28 @@ Usage Example (Next.js API Route)
        sourcePage: hdrs.get("referer") ?? undefined,
        userAgent: hdrs.get("user-agent") ?? undefined,
        ipAddress: hdrs.get("x-forwarded-for") ?? undefined,
-     }).catch(() => {}); // Never block the response
+     });
 
      return Response.json({ success: true });
    }
+
+For booking-cancellation hooks, use ``appendCommunicationBackground``
+instead so you log the cancellation without overwriting the rich
+``external_refs_json`` from the original ``booking.created``:
+
+.. code-block:: typescript
+
+   // lib/scheduler-init.ts (booking.cancelled hook)
+   import { appendCommunicationBackground } from "@/lib/client-hub";
+
+   onBookingCancelled((booking) => {
+     appendCommunicationBackground({
+       event: "booking_cancelled",
+       email: booking.customerEmail,
+       subject: `Cancelled: ${booking.serviceName}`,
+       body: `Appointment ${booking.appointmentId} cancelled`,
+     });
+   });
 
 .. _client-hub-cp-payload-contract:
 
@@ -236,7 +410,7 @@ external_refs_json Payload Contract
 Every integration MUST populate ``external_refs_json`` with as much
 of the following shape as is available on the caller side. The
 fields below are what the reference ``lib/client-hub.ts`` module
-collects; consumers of client-hub (reports, dashboards, Eaglesoft
+collects; consumers of Client Hub (reports, dashboards, Eaglesoft
 sync, etc.) assume these paths.
 
 .. code-block:: text
@@ -281,26 +455,95 @@ Scheduler cancellation / update hooks must NOT POST a thinner
 payload that overwrites the richer one from ``booking.created``.
 When ``booking.cancelled`` fires, either:
 
-1. **Preferred:** append a new ``communication`` row to the
-   existing contact via ``POST /api/v1/communications`` with
-   ``channel_code = booking_cancelled`` and leave the contact
-   row's ``external_refs_json`` alone.
+1. **Preferred (built into the reference module):** call
+   ``appendCommunicationBackground`` — it looks up the contact
+   by email via ``LookupApi``, then POSTs only a new communication
+   row, leaving the contact's ``external_refs_json`` untouched.
 2. **If the hook legitimately needs to update the contact:** GET
    the current ``external_refs_json``, deep-merge the new fields
    in (do NOT replace), then ``PUT /api/v1/contacts/{uuid}``.
 
 The dental care site hit this bug on 2026-04-11 — the
 ``booking.cancelled`` hook overwrote a rich ``booking.created``
-payload with a 3-field stub. See
-``docs/Dental-Care-Payload-Fix-Prompt.rst`` for the fix checklist.
+payload with a 3-field stub. The reference module's
+``appendCommunication`` shape is the regression-proof fix and is
+the approach both production consumer sites use today.
 
-.. rubric:: Checklist for new integrations (Clever Orchid, etc.)
+.. _client-hub-cp-production-consumers:
 
-Before wiring a new Web Factory site to client-hub, verify the
+**********************************************************************
+Production Consumers
+**********************************************************************
+
+The list below tracks every site running against a Client Hub
+production instance, the SDK version it pinned, and the cutover
+commit. Add a row when a new site goes live; bump the version when
+a site upgrades.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 22 18 22 16
+
+   * - Site
+     - Source code
+     - SDK pin
+     - Client Hub VPS
+     - Cutover commit
+   * - Complete Dental Care
+       (``completedentalcarecolumbia.com``)
+     - ``complete_dental_care_website``
+     - ``^0.3.5``
+     - ``client-hub-complete-dental-care.onlinesalessystems.com``
+     - ``0b46c9e`` (2026-05-05)
+   * - Clever Orchid
+       (``cleverorchid.com``)
+     - ``clever_orchid_website``
+     - ``^0.3.5``
+     - ``client-hub-clever-orchid.onlinesalessystems.com``
+     - ``6524034`` (2026-05-05)
+
+Both consumer sites use only ``ContactsApi``,
+``CommunicationsApi``, and ``LookupApi`` from the SDK today —
+the rest of the surface (``OrdersApi``, ``InvoicesApi``,
+``AffiliationsApi``, ``MarketingSourcesApi``, ``AdminApi``,
+``SpamPatternsApi``, etc.) is installed-but-unused. Plan accordingly
+when shipping changes that affect those classes — see the
+"Changes that need consumer-side coordination" rubric below.
+
+.. rubric:: Changes that need consumer-side coordination
+
+When changing the SDK, the matrix to think about:
+
+1. **Changes to** ``ContactsApi`` / ``CommunicationsApi`` /
+   ``LookupApi`` — these affect both production consumer sites.
+   Breaking changes here need a coordinated bump and a fresh
+   handoff prompt under ``docs/handoffs/``.
+2. **Changes to any other API class** — safe to make freely; no
+   active consumer reads them today.
+3. **OpenAPI spec → SDK regeneration cadence** — every Client Hub
+   release auto-publishes the matching SDK version via
+   ``.github/workflows/publish-sdk.yml``. Consumer sites pinned at
+   ``^0.3.x`` pick up patch versions on their next ``npm install``;
+   ``0.4.x`` is opt-in.
+
+.. _client-hub-cp-checklist:
+
+**********************************************************************
+Checklist for new integrations
+**********************************************************************
+
+Before wiring a new Web Factory site to Client Hub, verify the
 following in the site's ``lib/client-hub.ts`` and every caller:
 
-- [ ] ``CLIENTHUB_SOURCE_CODE`` env var set; ``site_source_code``
-  included in every ``external_refs_json``
+- [ ] ``.npmrc`` configured for ``@bradstancel:registry=...``;
+  ``NPM_TOKEN`` set as the install-time consumer token
+- [ ] ``@bradstancel/clienthub-sdk@^0.3.5`` (or current published
+  version) added to ``package.json`` and resolved in
+  ``package-lock.json``
+- [ ] ``CLIENTHUB_URL`` / ``CLIENTHUB_API_KEY`` /
+  ``CLIENTHUB_SOURCE_CODE`` set in ``.env.local`` and on the
+  production VPS
+- [ ] ``site_source_code`` included in every ``external_refs_json``
 - [ ] Every ``logConversion`` / ``logConversionBackground``
   caller passes ``sourcePage``, ``userAgent``, ``ipAddress``,
   ``referrer`` (read from ``next/headers`` or equivalent on the
@@ -310,9 +553,11 @@ following in the site's ``lib/client-hub.ts`` and every caller:
 - [ ] Scheduler / booking hooks populate the ``extra`` object with
   ``scheduler_event``, ``appointment_id``, ``service_name``,
   ``staff_name``, ``start_date``, ``total_price``
-- [ ] ``booking.cancelled`` / update hooks either append a
-  communication row OR deep-merge ``external_refs_json`` — they do
-  NOT replace
+- [ ] ``booking.cancelled`` / update hooks call
+  ``appendCommunicationBackground`` (NOT ``logConversionBackground``)
+  so the rich create-time ``external_refs_json`` is not clobbered
+- [ ] Add a row to the *Production Consumers* table above with the
+  cutover commit
 - [ ] End-to-end smoke test: submit a booking, cancel it, query
   ``SELECT external_refs_json FROM contacts ORDER BY created_at
   DESC LIMIT 1`` — every field above should be populated

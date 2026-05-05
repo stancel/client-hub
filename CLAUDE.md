@@ -16,12 +16,27 @@
 - **Schema:** 39 tables + 3 views in `clienthub` (3NF; through
   migration 029)
 - **API:** 37 endpoint paths, 180 tests passing
-- **SDKs:** Python, PHP, TypeScript (auto-generated)
-- **CI/CD:** GitHub Actions (lint → test → build → SDK gen)
-- **Deployment:** one-line installer (`scripts/install.sh`); two
-  production VPSes running v0.3.3:
+- **SDKs:** Python, PHP, TypeScript (auto-generated). The TypeScript
+  SDK is published to the private npm registry as
+  `@bradstancel/clienthub-sdk` on `https://npm.onlinesalessystems.com/`
+  (Verdaccio at `~/docker/verdaccio/`); both consumer Next.js sites
+  consume it from there as of v0.3.5.
+- **CI/CD:** GitHub Actions — `ci.yml` (lint → test → build → SDK
+  gen on push/PR to master), `publish-sdk.yml` (tag-triggered;
+  publishes the TypeScript SDK to Verdaccio on every `v*` tag using
+  the `NPM_TOKEN` repo secret = brad publisher).
+- **Deployment:** one-line installer (`scripts/install.sh`) for new
+  VPSes; `scripts/upgrade.sh --yes` for ongoing upgrades; two
+  production VPSes running v0.3.5:
   - `client-hub-complete-dental-care.onlinesalessystems.com` (CDC)
   - `client-hub-clever-orchid.onlinesalessystems.com` (Clever Orchid)
+- **Production consumer sites:** Complete Dental Care
+  (`completedentalcarecolumbia.com`, source code
+  `complete_dental_care_website`) and Clever Orchid
+  (`cleverorchid.com`, source code `clever_orchid_website`). Both
+  consume `@bradstancel/clienthub-sdk@^0.3.5`. See
+  `docs/Cross-Project-Integration.rst` for the canonical integration
+  pattern and the consumers register.
 
 ### Data Sources That Feed Into Client Hub
 

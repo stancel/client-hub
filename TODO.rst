@@ -520,6 +520,95 @@ Phase 16 — v0.3.4 follow-ups [COMPLETE]
   ``backups/clienthub-20260505-172927.sql.gz``; 7/7 smoke tests
   passed; date columns confirmed still ``date`` post-upgrade.
 
+.. _client-hub-todo-phase16-v0-3-5:
+
+Phase 16 — v0.3.5 follow-ups [COMPLETE]
+----------------------------------------------------------------------
+
+- [x] Publish the TypeScript SDK to the private Verdaccio registry
+  as ``@bradstancel/clienthub-sdk``. Patch
+  ``scripts/generate-sdks.sh`` to post-process the generated TS
+  ``package.json`` (name, repo, ``publishConfig``, ``files``,
+  ``prepublishOnly``), remove the auto-generated ``.npmignore``
+  (which excluded README.md), and replace the misleading
+  auto-generated README with curated private-registry install
+  instructions.
+- [x] Add ``.github/workflows/publish-sdk.yml`` — tag-triggered
+  publish workflow modeled on
+  ``@bradstancel/website-scheduler``'s ``publish.yml``. Configure
+  ``NPM_TOKEN`` GitHub repo secret with the brad publisher token
+  (consumer token returned 403 on first publish; brad token
+  authenticated correctly via ``curl /-/whoami`` returning
+  ``{"username": "brad"}``).
+- [x] First publish: ``@bradstancel/clienthub-sdk@0.3.5`` lands on
+  Verdaccio (``~/docker/verdaccio/storage/@bradstancel/clienthub-sdk/``,
+  36.2 kB tarball, sha ``643a7a67…``). ``npm view`` confirms
+  ``dist-tags.latest=0.3.5``.
+- [x] Deploy v0.3.5 to CDC API VPS via ``scripts/upgrade.sh --yes``:
+  pre-HEAD ``0ac5232``, post-HEAD ``8988db0``; backup
+  ``backups/clienthub-20260505-194633.sql.gz``; 7/7 smoke tests
+  passed.
+- [x] Deploy v0.3.5 to Clever Orchid API VPS via
+  ``scripts/upgrade.sh --yes``: same pre-/post-HEAD; backup
+  ``backups/clienthub-20260505-194650.sql.gz``; 7/7 smoke tests
+  passed.
+- [x] CDC consumer site (``completedentalcarecolumbia.com``)
+  migrated from hand-rolled ``fetch()`` to the published SDK in
+  commit ``0b46c9e``; deployed to droplet ``165.245.141.244``;
+  reported back with feedback rolled into the v0.3.6 queue below.
+- [x] Clever Orchid consumer site (``cleverorchid.com``) migrated
+  to the published SDK in commit ``6524034``; deployed to droplet
+  ``129.212.178.104``; uses only ``ContactsApi`` /
+  ``CommunicationsApi`` / ``LookupApi`` (rest of SDK surface
+  installed-but-unused).
+- [x] ``docs/Cross-Project-Integration.rst`` rewritten SDK-first
+  (the legacy hand-rolled ``fetch()`` reference module that misled
+  CDC's pre-cutover state is now removed; recoverable from git
+  history if needed). Added "Production Consumers" register so
+  every consumer site, its source code, its pinned SDK version,
+  its Client Hub VPS, and its cutover commit are tracked in one
+  table.
+
+.. _client-hub-todo-v0-3-6-queue:
+
+v0.3.6 queue (next time we cut a versioned release)
+----------------------------------------------------------------------
+
+These were surfaced by the CDC + Clever Orchid cutover reports.
+None are blocking; they ride the next release whenever it gets
+cut for any reason.
+
+- [ ] Add ``LookupResponse`` Pydantic schema (``matches: list[…],
+  count: int``); declare ``response_model=LookupResponse`` on both
+  routes in ``api/app/routers/lookup.py``. Currently the routes
+  return raw dicts with no response model, so OpenAPI emits
+  ``additionalProperties=true`` and the generated SDK types the
+  return as ``Promise<any>``. Both consumer sites currently cast
+  the response to ``{ matches: Array<{ uuid: string }> }`` to
+  work around this. Reported by Clever Orchid (#2).
+- [ ] Document the ``initOverrides.signal`` cancellation /
+  timeout pattern in the SDK's curated README (the heredoc inside
+  ``scripts/generate-sdks.sh``). One short section under "Timeouts
+  / cancellation" with the pattern from the consumer-site
+  ``withTimeout`` helper. Reported by CDC (#3) + Clever Orchid (#1).
+
+.. _client-hub-todo-v0-4-x-design:
+
+v0.4.x design parking lot
+----------------------------------------------------------------------
+
+- [ ] **SDK ergonomic facade.** OpenAPI Generator's default method
+  names are very long (e.g.,
+  ``createContactEndpointApiV1ContactsPost``,
+  ``lookupEmailApiV1LookupEmailEmailGet``). Both consumer sites
+  worked around this by isolating SDK calls inside their own
+  ``lib/client-hub.ts`` wrapper. A maintained
+  ``@bradstancel/clienthub-sdk-facade`` package (or a
+  ``client.contacts.create({...})``-style wrapper layer
+  regenerated alongside the raw SDK) would let future consumers
+  skip the wrapper module. Design conversation, not a quick patch
+  — owns its own version cycle. Reported by CDC (#2).
+
 .. _client-hub-todo-future:
 
 Future — Planned Work
