@@ -488,6 +488,38 @@ Phase 16 — v0.3.3 follow-ups [COMPLETE]
   (Clever Orchid / embroidery / America/New_York / USD / US /
   https://cleverorchid.com)
 
+.. _client-hub-todo-phase16-v0-3-4:
+
+Phase 16 — v0.3.4 follow-ups [COMPLETE]
+----------------------------------------------------------------------
+
+- [x] Fix ``Mapped[str] / String(10)`` ORM drift on five date
+  columns (``orders.order_date``, ``orders.due_date``,
+  ``invoices.invoice_date``, ``invoices.due_date``,
+  ``payments.payment_date``). Models now declare
+  ``Mapped[date] / Date`` to match the live ``DATE`` DDL on every
+  running instance — no migration needed; storage was already
+  correct. Discovered via stale EER export Steven extracted for the
+  InvoiceNinja → Client Hub ETL planning.
+- [x] Pydantic request/response schemas updated to use ``date`` /
+  ``date | None`` for the same fields. OpenAPI now reports
+  ``"format": "date"``; nullable fields use the
+  ``anyOf [string-date, null]`` shape.
+- [x] InvoiceNinja webhook ``payment_date`` now passes
+  ``datetime.now(timezone.utc).date()`` instead of a pre-formatted
+  string.
+- [x] Regenerate Python, PHP, TypeScript SDKs against the updated
+  spec; all stamped 0.3.4.
+- [x] All 180 tests pass unchanged; ruff + rstcheck clean.
+- [x] Deploy v0.3.4 to CDC via ``scripts/upgrade.sh --yes``: pre-HEAD
+  ``27c48c9``, post-HEAD ``0ac5232``; backup
+  ``backups/clienthub-20260505-172832.sql.gz``; 7/7 smoke tests
+  passed; date columns confirmed still ``date`` post-upgrade.
+- [x] Deploy v0.3.4 to Clever Orchid via ``scripts/upgrade.sh
+  --yes``: same pre-/post-HEAD; backup
+  ``backups/clienthub-20260505-172927.sql.gz``; 7/7 smoke tests
+  passed; date columns confirmed still ``date`` post-upgrade.
+
 .. _client-hub-todo-future:
 
 Future — Planned Work

@@ -129,7 +129,7 @@ Quick Info
    * - **MCP Tools**
      - ``apisix-mysql`` (``execute_sql``, ``search_objects``)
    * - **Production deployments**
-     - Two instances live on v0.3.3:
+     - Two instances live on v0.3.4:
        ``client-hub-complete-dental-care.onlinesalessystems.com``
        (Complete Dental Care) and
        ``client-hub-clever-orchid.onlinesalessystems.com``
