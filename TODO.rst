@@ -569,28 +569,75 @@ Phase 16 — v0.3.5 follow-ups [COMPLETE]
   its Client Hub VPS, and its cutover commit are tracked in one
   table.
 
-.. _client-hub-todo-v0-3-6-queue:
+.. _client-hub-todo-phase16-v0-3-6:
 
-v0.3.6 queue (next time we cut a versioned release)
+Phase 16 — v0.3.6 follow-ups [COMPLETE]
 ----------------------------------------------------------------------
 
-These were surfaced by the CDC + Clever Orchid cutover reports.
-None are blocking; they ride the next release whenever it gets
-cut for any reason.
+- [x] ``api/app/schemas/lookup.py`` (new) — typed ``LookupResponse``
+  with nested ``LookupMatch{Phone,Email,Order,Communication,ChannelPref}``.
+  ``api/app/routers/lookup.py`` declares
+  ``response_model=LookupResponse`` on both email + phone routes.
+  OpenAPI now references ``#/components/schemas/LookupResponse``
+  for the 200 responses; SDK ``lookupEmailApiV1LookupEmailEmailGet``
+  now returns ``Promise<LookupResponse>`` instead of
+  ``Promise<any>``. (Closes the defect both consumer sites flagged
+  in their v0.3.5 cutover reports.)
+- [x] ``scripts/generate-sdks.sh`` heredoc gained a "Timeouts and
+  cancellation" section documenting the ``initOverrides`` pattern
+  with a worked example. Both consumer-site Claude sessions had to
+  reverse-engineer this from the SDK runtime in v0.3.5.
+- [x] Live audit of both consumer sites' ``lib/client-hub.ts``:
+  CDC at ``/home/brad/Sites/complete-dental-care-nextjs`` (commit
+  ``0b46c9e``), Clever Orchid at
+  ``/home/brad/Sites/clever-orchid-website`` (commit ``6524034``).
+  Public surface identical; quality gaps each-way (CDC: lazy +
+  cached config; CO: ResponseError parsing, extended UTM,
+  trailing-slash strip).
+- [x] ``docs/Cross-Project-Integration.rst`` reference module
+  rewritten to embed the best-of-both canonical synthesis.
+- [x] ``scripts/deploy-all-vpses.sh`` (new) + ``deploy/vpses.txt``
+  (new) — multi-VPS deploy orchestrator. Reads the host list,
+  runs ``./scripts/upgrade.sh --yes`` against each sequentially,
+  verifies each via the public ``/api/v1/health`` and OpenAPI
+  version, prints a summary table, aborts on first failure so
+  remaining VPSes are untouched.
+- [x] Bug caught in CI on the first v0.3.6 tag (``f5d73b8``):
+  Pydantic ``Any | None`` in ``LookupMatchChannelPref.opt_in``
+  produced an OpenAPI property with no ``type``, which
+  openapi-generator's TypeScript template stamped as
+  ``optIn?:  | null;`` and tried to call bare ``FromJSON()`` /
+  ``ToJSON()`` helpers — TS compile error at publish time. Fixed
+  by typing ``opt_in`` as ``str | None`` (matching the underlying
+  ``contact_channel_prefs.opt_in_status`` ENUM column). v0.3.6
+  retag forward to ``4176b92``; second publish run succeeded; no
+  Verdaccio garbage left from the failed first run because the
+  npm publish step is gated behind the build that failed.
+- [x] First real run of ``scripts/deploy-all-vpses.sh``: rolled
+  v0.3.6 to both API VPSes sequentially. Pre-HEAD ``8988db0`` →
+  post-HEAD ``4176b92`` on each. Backups
+  ``clienthub-20260505-211711.sql.gz`` (CDC) and
+  ``clienthub-20260505-211823.sql.gz`` (CO). 7/7 smoke tests on
+  each. Both report ``v0.3.6`` on ``/api/v1/health``.
+- [x] Synthetic CDC live verification (pre-cut): POST
+  ``/api/v1/contacts`` with a clearly-marked ``ZZ-Verification``
+  payload via the SDK wire format proved end-to-end ingestion
+  against production CDC; row landed with proper provenance
+  (``first_seen_source_id=2`` correctly resolved); cleaned up
+  with no residue (CDC contacts back to baseline of 4).
+- [x] Handoff prompts for both consumer sites at
+  ``docs/handoffs/cdc-v0.3.6.md`` and
+  ``docs/handoffs/clever-orchid-v0.3.6.md`` — each spells out the
+  specific gaps that site needs to close to converge on the
+  canonical, plus the universal ``Promise<any>``-cast removal.
 
-- [ ] Add ``LookupResponse`` Pydantic schema (``matches: list[…],
-  count: int``); declare ``response_model=LookupResponse`` on both
-  routes in ``api/app/routers/lookup.py``. Currently the routes
-  return raw dicts with no response model, so OpenAPI emits
-  ``additionalProperties=true`` and the generated SDK types the
-  return as ``Promise<any>``. Both consumer sites currently cast
-  the response to ``{ matches: Array<{ uuid: string }> }`` to
-  work around this. Reported by Clever Orchid (#2).
-- [ ] Document the ``initOverrides.signal`` cancellation /
-  timeout pattern in the SDK's curated README (the heredoc inside
-  ``scripts/generate-sdks.sh``). One short section under "Timeouts
-  / cancellation" with the pattern from the consumer-site
-  ``withTimeout`` helper. Reported by CDC (#3) + Clever Orchid (#1).
+.. _client-hub-todo-v0-3-7-queue:
+
+v0.3.7 queue (next time we cut a versioned release)
+----------------------------------------------------------------------
+
+Empty. Open suggestions land here as they arrive from the consumer
+sites or from operational use of the v0.3.6 deploy orchestrator.
 
 .. _client-hub-todo-v0-4-x-design:
 

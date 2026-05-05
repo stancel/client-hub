@@ -26,8 +26,10 @@
   publishes the TypeScript SDK to Verdaccio on every `v*` tag using
   the `NPM_TOKEN` repo secret = brad publisher).
 - **Deployment:** one-line installer (`scripts/install.sh`) for new
-  VPSes; `scripts/upgrade.sh --yes` for ongoing upgrades; two
-  production VPSes running v0.3.5:
+  VPSes; `scripts/upgrade.sh --yes` for upgrades on a single VPS;
+  `scripts/deploy-all-vpses.sh` for one-command rollout across the
+  entire fleet (reads `deploy/vpses.txt`); two production VPSes
+  running v0.3.6:
   - `client-hub-complete-dental-care.onlinesalessystems.com` (CDC)
   - `client-hub-clever-orchid.onlinesalessystems.com` (Clever Orchid)
 - **Production consumer sites:** Complete Dental Care
