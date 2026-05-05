@@ -58,7 +58,7 @@ class LookupMatchChannelPref implements ModelInterface, ArrayAccess, \JsonSerial
       */
     protected static $openAPITypes = [
         'preferred' => 'bool',
-        'opt_in' => 'AnyOf'
+        'opt_in' => 'string'
     ];
 
     /**
@@ -329,7 +329,7 @@ class LookupMatchChannelPref implements ModelInterface, ArrayAccess, \JsonSerial
     /**
      * Gets opt_in
      *
-     * @return AnyOf|null
+     * @return string|null
      */
     public function getOptIn()
     {
@@ -339,7 +339,7 @@ class LookupMatchChannelPref implements ModelInterface, ArrayAccess, \JsonSerial
     /**
      * Sets opt_in
      *
-     * @param AnyOf|null $opt_in opt_in
+     * @param string|null $opt_in opt_in
      *
      * @return self
      */

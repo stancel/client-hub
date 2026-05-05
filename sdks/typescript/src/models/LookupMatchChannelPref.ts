@@ -27,10 +27,10 @@ export interface LookupMatchChannelPref {
     preferred: boolean;
     /**
      * 
-     * @type {}
+     * @type {string}
      * @memberof LookupMatchChannelPref
      */
-    optIn?:  | null;
+    optIn?: string | null;
 }
 
 /**
@@ -52,7 +52,7 @@ export function LookupMatchChannelPrefFromJSONTyped(json: any, ignoreDiscriminat
     return {
         
         'preferred': json['preferred'],
-        'optIn': json['opt_in'] == null ? undefined : FromJSON(json['opt_in']),
+        'optIn': json['opt_in'] == null ? undefined : json['opt_in'],
     };
 }
 
@@ -68,7 +68,7 @@ export function LookupMatchChannelPrefToJSONTyped(value?: LookupMatchChannelPref
     return {
         
         'preferred': value['preferred'],
-        'opt_in': ToJSON(value['optIn']),
+        'opt_in': value['optIn'],
     };
 }
 

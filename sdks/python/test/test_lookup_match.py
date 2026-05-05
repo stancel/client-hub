@@ -85,7 +85,7 @@ class TestLookupMatch(unittest.TestCase):
                 channel_preferences = {
                     'key' : clienthub.models.lookup_match_channel_pref.LookupMatchChannelPref(
                         preferred = True, 
-                        opt_in = null, )
+                        opt_in = '', )
                     }
             )
         else:

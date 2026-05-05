@@ -17,7 +17,7 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictBool
+from pydantic import BaseModel, ConfigDict, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
@@ -27,7 +27,7 @@ class LookupMatchChannelPref(BaseModel):
     LookupMatchChannelPref
     """ # noqa: E501
     preferred: StrictBool
-    opt_in: Optional[Any] = None
+    opt_in: Optional[StrictStr] = None
     __properties: ClassVar[List[str]] = ["preferred", "opt_in"]
 
     model_config = ConfigDict(
@@ -69,9 +69,6 @@ class LookupMatchChannelPref(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of opt_in
-        if self.opt_in:
-            _dict['opt_in'] = self.opt_in.to_dict()
         # set to None if opt_in (nullable) is None
         # and model_fields_set contains the field
         if self.opt_in is None and "opt_in" in self.model_fields_set:
@@ -90,7 +87,7 @@ class LookupMatchChannelPref(BaseModel):
 
         _obj = cls.model_validate({
             "preferred": obj.get("preferred"),
-            "opt_in": AnyOf.from_dict(obj["opt_in"]) if obj.get("opt_in") is not None else None
+            "opt_in": obj.get("opt_in")
         })
         return _obj
 

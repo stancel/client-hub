@@ -6,7 +6,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **preferred** | **bool** |  | 
-**opt_in** | [**AnyOf**](AnyOf.md) |  | [optional] 
+**opt_in** | **str** |  | [optional] 
 
 ## Example
 

@@ -36,7 +36,7 @@ class TestLookupMatchChannelPref(unittest.TestCase):
         if include_optional:
             return LookupMatchChannelPref(
                 preferred = True,
-                opt_in = None
+                opt_in = ''
             )
         else:
             return LookupMatchChannelPref(

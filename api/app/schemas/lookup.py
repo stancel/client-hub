@@ -1,5 +1,3 @@
-from typing import Any
-
 from pydantic import BaseModel
 
 
@@ -33,7 +31,7 @@ class LookupMatchCommunication(BaseModel):
 
 class LookupMatchChannelPref(BaseModel):
     preferred: bool
-    opt_in: Any | None = None
+    opt_in: str | None = None
 
 
 class LookupMatch(BaseModel):
