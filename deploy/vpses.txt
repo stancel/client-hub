@@ -1,0 +1,6 @@
+# One Client Hub API VPS hostname per line. Read by
+# scripts/deploy-all-vpses.sh. Lines starting with # and blank lines
+# are ignored. SSH access as root is required (matches the existing
+# install.sh / upgrade.sh access model).
+client-hub-complete-dental-care.onlinesalessystems.com
+client-hub-clever-orchid.onlinesalessystems.com

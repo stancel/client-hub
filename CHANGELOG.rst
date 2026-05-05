@@ -4,6 +4,71 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-v0-3-6:
+
+v0.3.6 — 2026-05-05 — Typed LookupResponse, canonical consumer module, deploy orchestrator
+==========================================================================================
+
+Three coordinated improvements driven by feedback from the v0.3.5
+production cutovers at Complete Dental Care (commit ``0b46c9e``) and
+Clever Orchid (commit ``6524034``).
+
+**Typed lookup response** (closes the ``Promise<any>`` defect both
+consumer sites flagged). New ``api/app/schemas/lookup.py`` adds
+``LookupResponse`` (``matches: list[LookupMatch], count: int``) plus
+nested ``LookupMatch{Phone,Email,Order,Communication,ChannelPref}``
+models. ``api/app/routers/lookup.py`` now declares
+``response_model=LookupResponse`` on both the email and phone
+routes. The OpenAPI spec now references
+``#/components/schemas/LookupResponse`` for the 200 responses, and
+the regenerated TypeScript SDK exposes
+``Promise<LookupResponse>`` instead of ``Promise<any>`` —
+consumer-side ``as { matches?: ... }`` cast workarounds can be
+deleted.
+
+**Canonical consumer-site reference module.** A live audit of both
+consumer sites' ``lib/client-hub.ts`` (read directly from
+``/home/brad/Sites/complete-dental-care-nextjs`` and
+``/home/brad/Sites/clever-orchid-website``) confirmed the public
+surface is identical across both, but each had small quality gaps
+the other had solved: CDC parsed ``ResponseError`` bodies, carried
+extended UTM fields (``gclid``, ``fbclid``, ``landing_page``,
+``captured_at``), and stripped trailing slashes from
+``CLIENTHUB_URL``; CO had a lazier ``apiKey: () => …`` Configuration
+and a cached ``getClients()`` so SDK clients aren't reallocated per
+call. ``docs/Cross-Project-Integration.rst`` now embeds a
+"best-of-both" canonical reference module that adopts every one of
+those patterns. The handoff prompts that ship for v0.3.6 spell out
+the per-site gap list each site needs to close to converge on the
+canonical.
+
+**Multi-VPS deploy orchestrator.** New
+``scripts/deploy-all-vpses.sh`` reads ``deploy/vpses.txt`` and rolls
+``./scripts/upgrade.sh --yes`` against every VPS sequentially,
+verifying each via the public ``/api/v1/health`` and OpenAPI
+version before continuing. Aborts on the first failure so remaining
+VPSes are left untouched. Replaces the
+"SSH into each VPS by hand" pattern we used through v0.3.5.
+``deploy/vpses.txt`` is the single source of truth for which VPSes
+constitute the production fleet — add a host on a new line and the
+next release picks it up.
+
+**SDK README cancellation/timeout docs.** The curated SDK README
+(written by the heredoc in ``scripts/generate-sdks.sh``) gained a
+"Timeouts and cancellation" section documenting the
+``initOverrides`` pattern. Both consumer-site Claude sessions had
+to reverse-engineer this from the SDK runtime source on their
+v0.3.5 cutovers — the doc now codifies it.
+
+**Verification:** all 180 existing tests pass with the new
+``response_model=LookupResponse`` declaration. ruff + rstcheck
+clean. SDK regenerated against the updated spec; OpenAPI
+``info.version`` reports ``0.3.6``. Pre-flight read of CDC's
+production database confirmed v0.3.5 SDK ingestion landed a
+properly-shaped row end-to-end (synthetic test contact
+``ZZ-Verification`` written via ``POST /api/v1/contacts``,
+verified in the DB, and cleaned up — no residue).
+
 .. _client-hub-changelog-v0-3-5:
 
 v0.3.5 — 2026-05-05 — Publish TypeScript SDK to private npm registry

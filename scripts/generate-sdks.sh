@@ -159,7 +159,7 @@ import { Configuration, ContactsApi } from '@bradstancel/clienthub-sdk';
 
 const config = new Configuration({
   basePath: 'https://your-clienthub-instance.example.com',
-  headers: { 'X-API-Key': process.env.CLIENT_HUB_API_KEY! },
+  apiKey: () => process.env.CLIENT_HUB_API_KEY ?? '',
 });
 
 const contacts = new ContactsApi(config);
@@ -169,6 +169,31 @@ const result = await contacts.listContacts();
 See your Client Hub instance's `/docs` URL for the full endpoint
 surface (Swagger UI auto-generated from the same spec this SDK was
 built from).
+
+## Timeouts and cancellation
+
+Every generated method takes an optional second argument
+`initOverrides` whose contents are spread into the underlying
+`fetch()` `RequestInit`. Pass an `AbortSignal` to apply a timeout
+or cancellation:
+
+```typescript
+const controller = new AbortController();
+const timer = setTimeout(() => controller.abort(), 3000);
+
+try {
+  await contacts.createContactEndpointApiV1ContactsPost(
+    { contactCreate: { contactType: 'lead', emails: [{ address: 'x@y' }] } },
+    { signal: controller.signal },
+  );
+} finally {
+  clearTimeout(timer);
+}
+```
+
+Any standard `fetch` option works the same way (`cache`,
+`credentials`, custom `headers`, etc.) — just pass it inside the
+`initOverrides` object.
 
 ## Source
 

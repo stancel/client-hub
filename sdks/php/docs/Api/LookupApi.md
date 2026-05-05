@@ -11,7 +11,7 @@ All URIs are relative to http://localhost, except if the operation defines anoth
 ## `lookupEmailApiV1LookupEmailEmailGet()`
 
 ```php
-lookupEmailApiV1LookupEmailEmailGet($email, $exact): mixed
+lookupEmailApiV1LookupEmailEmailGet($email, $exact): \ClientHub\Model\LookupResponse
 ```
 
 Lookup Email
@@ -55,7 +55,7 @@ try {
 
 ### Return type
 
-**mixed**
+[**\ClientHub\Model\LookupResponse**](../Model/LookupResponse.md)
 
 ### Authorization
 
@@ -73,7 +73,7 @@ try {
 ## `lookupPhoneApiV1LookupPhoneNumberGet()`
 
 ```php
-lookupPhoneApiV1LookupPhoneNumberGet($number, $exact): mixed
+lookupPhoneApiV1LookupPhoneNumberGet($number, $exact): \ClientHub\Model\LookupResponse
 ```
 
 Lookup Phone
@@ -117,7 +117,7 @@ try {
 
 ### Return type
 
-**mixed**
+[**\ClientHub\Model\LookupResponse**](../Model/LookupResponse.md)
 
 ### Authorization
 

@@ -9,7 +9,7 @@ Method | HTTP request | Description
 
 
 # **lookup_email_api_v1_lookup_email_email_get**
-> object lookup_email_api_v1_lookup_email_email_get(email, exact=exact)
+> LookupResponse lookup_email_api_v1_lookup_email_email_get(email, exact=exact)
 
 Lookup Email
 
@@ -19,6 +19,7 @@ Lookup Email
 
 ```python
 import clienthub
+from clienthub.models.lookup_response import LookupResponse
 from clienthub.rest import ApiException
 from pprint import pprint
 
@@ -67,7 +68,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-**object**
+[**LookupResponse**](LookupResponse.md)
 
 ### Authorization
 
@@ -88,7 +89,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **lookup_phone_api_v1_lookup_phone_number_get**
-> object lookup_phone_api_v1_lookup_phone_number_get(number, exact=exact)
+> LookupResponse lookup_phone_api_v1_lookup_phone_number_get(number, exact=exact)
 
 Lookup Phone
 
@@ -98,6 +99,7 @@ Lookup Phone
 
 ```python
 import clienthub
+from clienthub.models.lookup_response import LookupResponse
 from clienthub.rest import ApiException
 from pprint import pprint
 
@@ -146,7 +148,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-**object**
+[**LookupResponse**](LookupResponse.md)
 
 ### Authorization
 

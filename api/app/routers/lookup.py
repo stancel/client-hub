@@ -3,12 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.auth import require_api_key
+from app.schemas.lookup import LookupResponse
 from app.services.lookup_service import lookup_by_email, lookup_by_phone
 
 router = APIRouter(prefix="/lookup", tags=["lookup"], dependencies=[Depends(require_api_key)])
 
 
-@router.get("/phone/{number}")
+@router.get("/phone/{number}", response_model=LookupResponse)
 async def lookup_phone(
     number: str,
     exact: bool = Query(True),
@@ -20,7 +21,7 @@ async def lookup_phone(
     return {"matches": matches, "count": len(matches)}
 
 
-@router.get("/email/{email:path}")
+@router.get("/email/{email:path}", response_model=LookupResponse)
 async def lookup_email(
     email: str,
     exact: bool = Query(True),

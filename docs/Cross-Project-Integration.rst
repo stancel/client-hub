@@ -121,40 +121,50 @@ Reference Module: lib/client-hub.ts (SDK-based)
 **********************************************************************
 
 Drop this file into your Next.js project at ``lib/client-hub.ts``.
-Modeled on the actual production cutover at CDC (commit ``0b46c9e``)
-and Clever Orchid (commit ``6524034``). The public surface
-(``logConversion``, ``logConversionBackground``,
-``appendCommunication``, ``appendCommunicationBackground``,
+Synthesized from the production cutovers at Complete Dental Care
+(commit ``0b46c9e``) and Clever Orchid (commit ``6524034``) on
+2026-05-05. Both consumer sites should keep this file
+byte-identical (modulo the tenant-specific URL in the header
+comment) so future changes are a single edit propagated via a
+handoff prompt from the Client Hub project. Public surface —
 ``ConversionEvent``, ``LogConversionInput``,
-``AppendCommunicationInput``) is the same as the legacy
-hand-rolled module so call sites do not change when migrating.
+``AppendCommunicationInput``, ``logConversion``,
+``logConversionBackground``, ``appendCommunication``,
+``appendCommunicationBackground``, ``splitName``,
+``readRequestMeta`` — is the SDK-stable contract every consumer
+site exposes to its own callers.
 
 .. code-block:: typescript
 
    // lib/client-hub.ts
-   // Send conversion events to Client Hub via @bradstancel/clienthub-sdk.
-   // Error-swallowing — never crashes caller.
+   //
+   // Send conversion events to the Client Hub Customer & Prospect
+   // Intelligence system. Implemented on top of @bradstancel/clienthub-sdk
+   // (published to the private registry at npm.onlinesalessystems.com).
+   // The SDK is auto-generated from the Client Hub OpenAPI spec on
+   // every release.
+   //
+   // This file is the canonical reference module. Both consumer sites
+   // should keep it byte-identical (modulo the tenant-specific URL in
+   // the header comment) so future changes are a single edit
+   // propagated via a handoff prompt from the Client Hub project at
+   // docs/Cross-Project-Integration.rst.
+   //
+   // Error-swallowing by design — never crashes the caller. Client Hub
+   // downtime must not break form submissions or booking flows.
 
    import {
+     CommunicationsApi,
      Configuration,
      ContactsApi,
-     CommunicationsApi,
      LookupApi,
      ResponseError,
    } from "@bradstancel/clienthub-sdk";
 
+   const CLIENTHUB_URL = process.env.CLIENTHUB_URL || "";
+   const CLIENTHUB_API_KEY = process.env.CLIENTHUB_API_KEY || "";
+   const CLIENTHUB_SOURCE_CODE = process.env.CLIENTHUB_SOURCE_CODE || "unknown";
    const TIMEOUT_MS = 3000;
-
-   const config = new Configuration({
-     basePath: process.env.CLIENTHUB_URL ?? "https://client-hub.example.com",
-     // Function form so the env var is read on every request, not at
-     // module-load time. Important for Next.js dev/HMR and edge cases.
-     apiKey: () => process.env.CLIENTHUB_API_KEY ?? "",
-   });
-
-   const contacts = new ContactsApi(config);
-   const communications = new CommunicationsApi(config);
-   const lookups = new LookupApi(config);
 
    export type ConversionEvent =
      | "web_form"
@@ -177,7 +187,6 @@ hand-rolled module so call sites do not change when migrating.
      subject?: string;
      body?: string;
      sourcePage?: string;
-     siteSourceCode?: string;
      referrer?: string;
      userAgent?: string;
      ipAddress?: string;
@@ -188,160 +197,263 @@ hand-rolled module so call sites do not change when migrating.
        campaign?: string;
        term?: string;
        content?: string;
+       gclid?: string;
+       fbclid?: string;
+       landing_page?: string;
+       captured_at?: string;
      };
      extra?: Record<string, unknown>;
    }
 
-   export interface AppendCommunicationInput {
-     event: ConversionEvent;
-     email: string; // required — used to look up the existing contact
-     subject?: string;
-     body?: string;
+   // Lazily build the SDK clients so missing env vars at import time
+   // don't throw — the public functions already handle the
+   // unconfigured case. Cached so we don't reallocate config + clients
+   // per call.
+   let cachedClients: {
+     contacts: ContactsApi;
+     communications: CommunicationsApi;
+     lookup: LookupApi;
+   } | null = null;
+
+   function getClients() {
+     if (cachedClients) return cachedClients;
+     const config = new Configuration({
+       basePath: CLIENTHUB_URL.replace(/\/+$/, ""),
+       // Function form so the env var is read on every request, not at
+       // module-load time. Important for Next.js dev/HMR and edge cases.
+       apiKey: () => CLIENTHUB_API_KEY,
+     });
+     cachedClients = {
+       contacts: new ContactsApi(config),
+       communications: new CommunicationsApi(config),
+       lookup: new LookupApi(config),
+     };
+     return cachedClients;
    }
 
-   function withTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+   function configured(): boolean {
+     if (!CLIENTHUB_URL || !CLIENTHUB_API_KEY) {
+       if (process.env.NODE_ENV === "production") {
+         console.warn(
+           "[client-hub] CLIENTHUB_URL or CLIENTHUB_API_KEY not set; skipping",
+         );
+       }
+       return false;
+     }
+     return true;
+   }
+
+   function withTimeout(): { signal: AbortSignal; cancel: () => void } {
      const controller = new AbortController();
-     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-     return fn(controller.signal).finally(() => clearTimeout(timer));
+     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+     return { signal: controller.signal, cancel: () => clearTimeout(timeoutId) };
    }
 
    async function readErrorBody(err: unknown): Promise<string> {
      if (err instanceof ResponseError) {
-       const status = err.response.status;
        try {
          const text = await err.response.text();
-         return `${status} ${text}`;
+         return `${err.response.status} ${text.slice(0, 200)}`;
        } catch {
-         return `${status} <body unreadable>`;
+         return `${err.response.status}`;
        }
      }
-     return String(err);
+     return err instanceof Error ? err.message : String(err);
    }
 
-   /**
-    * Create / upsert a contact and log a communication row in one shot.
-    * Use for first-time events (web_form, booking.created).
-    */
    export async function logConversion(input: LogConversionInput): Promise<void> {
-     if (!process.env.CLIENTHUB_API_KEY) {
-       console.warn("[client-hub] CLIENTHUB_API_KEY not set; skipping");
-       return;
-     }
+     if (!configured()) return;
 
-     await withTimeout(async (signal) => {
-       try {
-         const contact = await contacts.createContactEndpointApiV1ContactsPost(
-           {
-             contactCreate: {
-               contactType: "lead",
-               firstName: input.firstName ?? "",
-               lastName: input.lastName ?? "",
-               emails: input.email
-                 ? [{ address: input.email, isPrimary: true }]
-                 : [],
-               phones: input.phone
-                 ? [{ number: input.phone, isPrimary: true }]
-                 : [],
-               externalRefsJson: {
-                 source_page: input.sourcePage,
-                 site_source_code:
-                   input.siteSourceCode ?? process.env.CLIENTHUB_SOURCE_CODE,
-                 referrer: input.referrer,
-                 user_agent: input.userAgent,
-                 ip_address: input.ipAddress,
-                 gtm_client_id: input.gtmClientId,
-                 utm: input.utm,
-                 extra: input.extra,
-               },
-             },
-           },
-           { signal }, // SDK runtime spreads initOverrides into RequestInit
-         );
+     const occurredAt = new Date().toISOString();
+     const externalRefs: Record<string, unknown> = {
+       source_page: input.sourcePage,
+       referrer: input.referrer,
+       user_agent: input.userAgent,
+       ip_address: input.ipAddress,
+       gtm_client_id: input.gtmClientId,
+       utm: input.utm,
+       extra: input.extra,
+       site_source_code: CLIENTHUB_SOURCE_CODE,
+     };
 
-         await communications.createCommunicationApiV1CommunicationsPost(
-           {
-             commCreate: {
-               contactUuid: contact.uuid,
-               channel: input.event,
-               direction: "inbound",
-               occurredAt: new Date().toISOString(),
-               subject: input.subject,
-               body: input.body,
-             },
+     const { contacts, communications } = getClients();
+     const { signal, cancel } = withTimeout();
+
+     try {
+       const contact = (await contacts.createContactEndpointApiV1ContactsPost(
+         {
+           contactCreate: {
+             contactType: "lead",
+             firstName: input.firstName ?? "",
+             lastName: input.lastName ?? "",
+             emails: input.email
+               ? [{ address: input.email, isPrimary: true }]
+               : [],
+             phones: input.phone
+               ? [{ number: input.phone, isPrimary: true }]
+               : [],
+             externalRefsJson: externalRefs,
            },
-           { signal },
-         );
-       } catch (err) {
+         },
+         { signal },
+       )) as { uuid?: string };
+
+       if (!contact?.uuid) {
          console.warn(
-           `[client-hub] logConversion failed: ${await readErrorBody(err)}`,
+           "[client-hub] contact create returned no uuid; skipping comm",
          );
+         return;
        }
+
+       await communications.createCommunicationApiV1CommunicationsPost(
+         {
+           commCreate: {
+             contactUuid: contact.uuid,
+             channel: input.event,
+             direction: "inbound",
+             occurredAt,
+             subject: input.subject ?? "",
+             body: input.body ?? "",
+           },
+         },
+         { signal },
+       );
+     } catch (err) {
+       console.warn("[client-hub] event failed:", await readErrorBody(err));
+     } finally {
+       cancel();
+     }
+   }
+
+   export function logConversionBackground(input: LogConversionInput): void {
+     logConversion(input).catch(() => {
+       /* already logged inside logConversion */
      });
    }
 
+   export interface AppendCommunicationInput {
+     /** Identify the existing contact by email (looked up via /lookup/email). */
+     email: string;
+     event: ConversionEvent;
+     subject?: string;
+     body?: string;
+     /** Override the event occurrence time (defaults to now, UTC). */
+     occurredAt?: string;
+   }
+
    /**
-    * Append a communication row to an EXISTING contact (looked up by
-    * email). Use for follow-up events (booking.cancelled) so the rich
-    * create-time external_refs_json on the contact row is not clobbered.
-    * See "Don't shadow — merge" below for the full contract.
+    * Append a communication row to an existing contact, found by email.
+    *
+    * Use this for follow-up events on a contact that already exists —
+    * especially cancellation events. Unlike logConversion, this does
+    * NOT re-upsert the contact, so it will not clobber the richer
+    * external_refs_json that the original create hook already wrote.
+    *
+    * If no contact exists for the email, the call is a no-op (with a
+    * warning) rather than creating a new contact.
     */
    export async function appendCommunication(
      input: AppendCommunicationInput,
    ): Promise<void> {
-     if (!process.env.CLIENTHUB_API_KEY) {
-       console.warn("[client-hub] CLIENTHUB_API_KEY not set; skipping");
+     if (!configured()) return;
+     if (!input.email) {
+       console.warn(
+         "[client-hub] appendCommunication called with no email; skipping",
+       );
        return;
      }
 
-     await withTimeout(async (signal) => {
-       try {
-         // LookupApi response is currently typed as `any` server-side
-         // (no response_model on the FastAPI route); cast to the known
-         // shape. Tracked as a v0.3.6+ TODO on the Client Hub project.
-         const result = (await lookups.lookupEmailApiV1LookupEmailEmailGet(
-           { email: input.email },
-           { signal },
-         )) as { matches?: Array<{ uuid: string }> };
+     const occurredAt = input.occurredAt ?? new Date().toISOString();
+     const { lookup, communications } = getClients();
+     const { signal, cancel } = withTimeout();
 
-         const matches = result.matches ?? [];
-         if (!matches.length) {
-           console.warn(
-             `[client-hub] appendCommunication: no contact for ${input.email}`,
-           );
-           return;
-         }
+     try {
+       // As of v0.3.6 the lookup endpoint declares response_model
+       // (LookupResponse), so the SDK return type is properly typed
+       // and the consumer-side cast is no longer needed.
+       const lookupResult = await lookup.lookupEmailApiV1LookupEmailEmailGet(
+         { email: input.email },
+         { signal },
+       );
 
-         await communications.createCommunicationApiV1CommunicationsPost(
-           {
-             commCreate: {
-               contactUuid: matches[0].uuid,
-               channel: input.event,
-               direction: "inbound",
-               occurredAt: new Date().toISOString(),
-               subject: input.subject,
-               body: input.body,
-             },
-           },
-           { signal },
-         );
-       } catch (err) {
+       const contactUuid = lookupResult.matches?.[0]?.uuid;
+       if (!contactUuid) {
          console.warn(
-           `[client-hub] appendCommunication failed: ${await readErrorBody(err)}`,
+           `[client-hub] appendCommunication: no contact found for ${input.email}`,
          );
+         return;
        }
-     });
+
+       await communications.createCommunicationApiV1CommunicationsPost(
+         {
+           commCreate: {
+             contactUuid,
+             channel: input.event,
+             direction: "inbound",
+             occurredAt,
+             subject: input.subject ?? "",
+             body: input.body ?? "",
+           },
+         },
+         { signal },
+       );
+     } catch (err) {
+       console.warn(
+         "[client-hub] appendCommunication failed:",
+         await readErrorBody(err),
+       );
+     } finally {
+       cancel();
+     }
    }
 
-   /** Fire-and-forget version — does not await. */
-   export function logConversionBackground(input: LogConversionInput): void {
-     logConversion(input).catch(() => {});
-   }
-
-   /** Fire-and-forget version — does not await. */
    export function appendCommunicationBackground(
      input: AppendCommunicationInput,
    ): void {
-     appendCommunication(input).catch(() => {});
+     appendCommunication(input).catch(() => {
+       /* already logged inside appendCommunication */
+     });
+   }
+
+   /**
+    * Utility: split a display name like "Mary Beth Smith" into
+    * { firstName: "Mary", lastName: "Beth Smith" }. Preserves
+    * everything after the first space as the last name so compound
+    * last names survive.
+    */
+   export function splitName(full: string): { firstName: string; lastName: string } {
+     const trimmed = (full ?? "").trim();
+     if (!trimmed) return { firstName: "", lastName: "" };
+     const spaceIdx = trimmed.indexOf(" ");
+     if (spaceIdx === -1) return { firstName: trimmed, lastName: "" };
+     return {
+       firstName: trimmed.slice(0, spaceIdx),
+       lastName: trimmed.slice(spaceIdx + 1),
+     };
+   }
+
+   /**
+    * Read request metadata (user agent, IP, referrer) from Next.js
+    * server-side request headers. Returns undefined fields when called
+    * outside a request context (e.g. from scheduled background jobs).
+    */
+   export async function readRequestMeta(): Promise<{
+     userAgent?: string;
+     ipAddress?: string;
+     referrer?: string;
+   }> {
+     try {
+       const { headers } = await import("next/headers");
+       const h = await headers();
+       const xff = h.get("x-forwarded-for")?.split(",")[0]?.trim();
+       return {
+         userAgent: h.get("user-agent") ?? undefined,
+         ipAddress: xff || h.get("x-real-ip") || undefined,
+         referrer: h.get("referer") ?? undefined,
+       };
+     } catch {
+       return {};
+     }
    }
 
 .. _client-hub-cp-usage:

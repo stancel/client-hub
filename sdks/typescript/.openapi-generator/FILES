@@ -32,6 +32,13 @@ src/models/DiscountAmount.ts
 src/models/HTTPValidationError.ts
 src/models/InlineAffiliationCreate.ts
 src/models/InvoiceCreate.ts
+src/models/LookupMatch.ts
+src/models/LookupMatchChannelPref.ts
+src/models/LookupMatchCommunication.ts
+src/models/LookupMatchEmail.ts
+src/models/LookupMatchOrder.ts
+src/models/LookupMatchPhone.ts
+src/models/LookupResponse.ts
 src/models/MarketingOptOuts.ts
 src/models/OrderCreate.ts
 src/models/OrderItemCreate.ts
