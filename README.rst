@@ -123,9 +123,16 @@ Quick Info
    * - **Test Suite**
      - 180 tests across 22 files
    * - **SDKs**
-     - Python, PHP, TypeScript (auto-generated from OpenAPI)
+     - Python, PHP, TypeScript (auto-generated from OpenAPI). The
+       TypeScript SDK is published to Verdaccio as
+       ``@bradstancel/clienthub-sdk`` on
+       ``https://npm.onlinesalessystems.com/``.
    * - **CI/CD**
-     - GitHub Actions (lint → test → build → SDK gen)
+     - GitHub Actions: ``ci.yml`` (lint → test → build → SDK gen on
+       push/PR) + ``publish-sdk.yml`` (npm publish on ``v*`` tag)
+   * - **Multi-VPS deploy**
+     - ``scripts/deploy-all-vpses.sh`` (reads ``deploy/vpses.txt``);
+       sequential rollout with health verification per host
    * - **MCP Tools**
      - ``apisix-mysql`` (``execute_sql``, ``search_objects``)
    * - **Production deployments**
@@ -372,7 +379,14 @@ Auto-generated from the OpenAPI spec using openapi-generator-cli:
 
 - **Python:** ``sdks/python/`` — pip-installable ``clienthub`` package
 - **PHP:** ``sdks/php/`` — Composer-compatible library
-- **TypeScript:** ``sdks/typescript/`` — npm-compatible, ES6
+- **TypeScript:** ``sdks/typescript/`` — published to the private
+  Verdaccio registry as ``@bradstancel/clienthub-sdk`` on
+  ``https://npm.onlinesalessystems.com/``. Consumer Next.js sites
+  install with ``npm install @bradstancel/clienthub-sdk@^X.Y.Z``
+  against the same ``.npmrc`` they already use for
+  ``@bradstancel/website-scheduler``. The publish workflow at
+  ``.github/workflows/publish-sdk.yml`` runs on every ``v*`` tag
+  push, so cutting a release auto-ships the SDK.
 
 Regenerate anytime:
 
@@ -380,6 +394,11 @@ Regenerate anytime:
 
    ./scripts/generate-sdks.sh           # All SDKs
    ./scripts/generate-sdks.sh python    # Python only
+
+For consumer-site integration patterns (the canonical
+``lib/client-hub.ts`` reference module, the Production Consumers
+register, and the per-tenant install flow) see
+``docs/Cross-Project-Integration.rst``.
 
 .. _client-hub-testing:
 
@@ -402,12 +421,28 @@ Test Driven Development (TDD) — every endpoint has tests.
 CI/CD
 **********************************************************************
 
-GitHub Actions pipeline (``.github/workflows/ci.yml``):
+Two GitHub Actions workflows:
+
+**Push / PR to master** (``.github/workflows/ci.yml``):
 
 1. **Lint** — ruff (Python) + rstcheck (RST docs)
 2. **Test** — pytest against MariaDB 12 service container
 3. **Build** — Docker image build and verify
 4. **SDK Gen** — Regenerate SDKs from OpenAPI (master only)
+
+**Tag push, ``v*``** (``.github/workflows/publish-sdk.yml``):
+
+1. Set up Node 20 with the private Verdaccio registry as the
+   publish target (scope ``@bradstancel``)
+2. ``npm install`` (which runs the SDK ``prepare`` build via
+   ``tsc``)
+3. Verify the git tag matches ``sdks/typescript/package.json``
+   version
+4. ``npm publish`` to ``https://npm.onlinesalessystems.com/`` using
+   the ``NPM_TOKEN`` repo secret (the brad publisher token)
+
+Tagging ``vX.Y.Z`` is the single action that ships a new SDK to
+consumer sites.
 
 .. _client-hub-related-projects:
 
@@ -496,24 +531,27 @@ Project Structure
    ├── migrations/                           # 28 numbered SQL files (001-029)
    │   └── dev/                              # Dev/CI-only seed data
    │       └── 012_seed_test_data.sql
-   ├── scripts/                              # 12 shell scripts + 7 one-shot SQL scripts
+   ├── scripts/                              # 13 shell scripts + 7 one-shot SQL scripts
    │   ├── install.sh                        # One-line production installer
    │   ├── uninstall.sh                      # Preserves .env + install summary
-   │   ├── upgrade.sh                        # Coordinated VPS upgrade runner
+   │   ├── upgrade.sh                        # Coordinated single-VPS upgrade runner
+   │   ├── deploy-all-vpses.sh               # Multi-VPS rollout (reads deploy/vpses.txt)
    │   ├── bootstrap-migrations.sh           # Migration runner (--via-docker for bundled VPSes)
    │   ├── backfill-schema-tracker.sh        # Record pre-mig-018 migrations as applied
    │   ├── detect-drift.sh                   # Sanity-check FK column types pre-upgrade
    │   ├── setup-opsinsights-tls.sh          # OpsInsights TLS + IP-allowlist setup
-   │   ├── generate-sdks.sh                  # SDK generation (Python/PHP/TS)
+   │   ├── generate-sdks.sh                  # SDK generation (Python/PHP/TS) + Verdaccio publish prep
    │   ├── generate-api-key.sh               # Create source-scoped API keys
    │   ├── smoke-test.sh                     # Post-install smoke test
    │   ├── cleanup-test-data.sh              # Strip seed data from contaminated prod
    │   └── backup.sh                         # Database backup helper
+   ├── deploy/                               # Operational config
+   │   └── vpses.txt                         # Production fleet host list (deploy-all-vpses.sh)
    ├── sdks/                                 # Auto-generated client SDKs
    │   ├── openapi.json                      # Cached OpenAPI spec
    │   ├── python/
    │   ├── php/
-   │   └── typescript/
+   │   └── typescript/                       # Published as @bradstancel/clienthub-sdk on Verdaccio
    ├── docs/                                 # RST documentation (19 files)
    │   ├── architecture.rst
    │   ├── data-model.rst
@@ -522,6 +560,7 @@ Project Structure
    │   ├── Migration-Strategy.rst
    │   ├── Spam-Defense-Pattern.rst
    │   ├── Multi-Source.rst
+   │   ├── Sources.rst
    │   ├── Deployment.rst
    │   ├── Upgrade.rst
    │   ├── Data-Privacy.rst
@@ -533,6 +572,9 @@ Project Structure
    │   ├── Post-Deployment-Fixes-Prompt.rst
    │   ├── External-Refs-Json-Fix-Prompt.rst
    │   └── Dental-Care-Payload-Fix-Prompt.rst
+   ├── .github/workflows/                    # CI/CD
+   │   ├── ci.yml                            # lint → test → build → SDK gen (push/PR)
+   │   └── publish-sdk.yml                   # npm publish on v* tag (Verdaccio)
    └── upgrades/                             # Pre-upgrade analysis docs
 
 .. _client-hub-references:

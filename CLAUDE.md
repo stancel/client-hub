@@ -95,14 +95,24 @@ client-hub/
 ├── migrations/                           # 28 numbered SQL migrations (001-029; 012 in dev/)
 │   └── dev/                              # Dev/CI-only seed data (012_seed_test_data.sql)
 ├── scripts/                              # install.sh, uninstall.sh, bootstrap-migrations.sh,
-│                                         # upgrade.sh, generate-sdks.sh, smoke-test.sh,
+│                                         # upgrade.sh, deploy-all-vpses.sh,
+│                                         # generate-sdks.sh, smoke-test.sh,
 │                                         # cleanup-test-data.sh, generate-api-key.sh,
 │                                         # backup.sh, setup-opsinsights-tls.sh,
 │                                         # detect-drift.sh, backfill-schema-tracker.sh
-├── sdks/                                 # Auto-generated Python, PHP, TypeScript SDKs
-├── docs/                                 # RST documentation (17 files) + handoff prompts
+│                                         # (plus per-deploy SQL helpers)
+├── deploy/                               # Operational config — vpses.txt is the
+│                                         # production fleet host list read by
+│                                         # scripts/deploy-all-vpses.sh
+├── sdks/                                 # Auto-generated Python, PHP, TypeScript SDKs;
+│                                         # TS SDK is published to Verdaccio as
+│                                         # @bradstancel/clienthub-sdk by
+│                                         # .github/workflows/publish-sdk.yml on tag push
+├── docs/                                 # RST documentation (19 files) + handoff prompts
 ├── upgrades/                             # Pre-upgrade analysis documents
-├── .github/                              # CI/CD workflows
+├── .github/                              # CI/CD workflows: ci.yml (lint→test→build→
+│                                         # SDK gen on push/PR) + publish-sdk.yml
+│                                         # (tag-triggered npm publish to Verdaccio)
 ├── docker-compose.yml                    # Local Cybertron compose (my-main-net, shared mariadb)
 ├── docker-compose.bundled.yml            # Production bundled (API + MariaDB + Caddy with TLS)
 ├── docker-compose.bundled-nodomain.yml   # Production bundled (no TLS)
@@ -232,7 +242,7 @@ docker compose down && docker compose build --no-cache && docker compose up -d
 - **Soft deletes:** Use is_active/deleted_at rather than hard deletes
 - **Data provenance:** Track enriched vs. manually entered fields, source, last verified
 - **Explicit opt-out flags:** Boolean 1/0 for marketing opt-outs (SMS, email, phone)
-- **DB-level intelligence:** Views (`v_contact_summary`, `v_contact_last_order`) available via SQL
+- **DB-level intelligence:** Views (`v_contact_summary`, `v_contact_last_order`, `v_events_by_source`) available via SQL
 
 ## Key Database Views
 
@@ -260,8 +270,20 @@ Auto-generated from OpenAPI spec. Regenerate on any API change:
 
 ## CI/CD Pipeline
 
-GitHub Actions (`.github/workflows/ci.yml`):
+GitHub Actions, two workflows:
+
+**`.github/workflows/ci.yml`** (push / PR to master):
+
 1. **Lint** — ruff + rstcheck
 2. **Test** — pytest against MariaDB 12 service container
 3. **Build** — Docker image
 4. **SDK Gen** — Regenerate SDKs (master branch only)
+
+**`.github/workflows/publish-sdk.yml`** (tag push, `v*`):
+
+1. Checkout, set up Node 20 with the private registry as the publish target
+2. Install + build (the `prepare` script runs `tsc`)
+3. Verify the git tag matches `sdks/typescript/package.json` version
+4. `npm publish` to `https://npm.onlinesalessystems.com/` using the `NPM_TOKEN` repo secret (the **brad** publisher token, not consumer)
+
+Tagging `vX.Y.Z` is therefore the single action that ships a new SDK to consumer sites — they pick it up on their next `npm install` per their `^X.Y.Z` pin.
