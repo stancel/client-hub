@@ -376,3 +376,87 @@ async def test_admin_mark_false_positive_bumps_pattern_counter(client, auth_head
     await client.delete(
         f"/api/v1/admin/spam-patterns/{pat_uuid}", headers=auth_headers,
     )
+
+
+# =============================================================================
+# v0.4.0 — SEO-outreach pattern coverage (driven by 2026-05-06 CDC breakthrough)
+# =============================================================================
+DAVIS_BROWN_BODY = (
+    "Re: Drop Traffic\n\n"
+    "Hello Good Morning,\n\n"
+    "I have found some major errors that correspond to a drop in website  "
+    "traffic over the last 1-2 months and wanted to bring them to your "
+    "attention.\n\n"
+    "I'd be happy to send you errors and the solutions to help you "
+    "improve the performance and traffic of your website.\n\n"
+    "Thankyou\nDavis Brown"
+)
+
+
+@pytest.mark.asyncio
+async def test_seo_outreach_email_substring_rejects_at_contact(client, auth_headers):
+    """The Davis Brown email (`davisseowebexpert@gmail.com`) must reject
+    via the new ``seowebexpert`` email_substring pattern."""
+    resp = await client.post(
+        "/api/v1/contacts",
+        headers=auth_headers,
+        json={
+            "first_name": "Davis",
+            "last_name": "BrownTest2",
+            "contact_type": "lead",
+            "emails": [
+                {"address": "davisseowebexpert+t1@gmail.com",
+                 "type": "personal", "is_primary": True}
+            ],
+            # Use a valid NANP area code so the phone check doesn't fire
+            # first — we want to assert the email rule is doing the work.
+            "phones": [
+                {"number": "(212) 555-0188", "type": "mobile",
+                 "is_primary": True}
+            ],
+            "external_refs_json": {"ip_address": "8.8.4.6"},
+        },
+    )
+    assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_seo_outreach_body_rejects_at_communications(client, auth_headers):
+    """The Davis Brown body must hit ≥2 phrase patterns and reject as
+    phrase_combo when posted to /communications."""
+    create = await client.post(
+        "/api/v1/contacts",
+        headers=auth_headers,
+        json={
+            "first_name": "SEO",
+            "last_name": "BodyTarget",
+            "contact_type": "lead",
+            "emails": [
+                {"address": "seo-body-target@example.org",
+                 "type": "personal", "is_primary": True}
+            ],
+            "phones": [
+                {"number": "(212) 555-0189", "type": "mobile",
+                 "is_primary": True}
+            ],
+            "external_refs_json": {"ip_address": "8.8.4.7"},
+        },
+    )
+    assert create.status_code == 201, create.text
+    contact_uuid = create.json()["uuid"]
+
+    resp = await client.post(
+        "/api/v1/communications",
+        headers=auth_headers,
+        json={
+            "contact_uuid": contact_uuid,
+            "channel": "web_form",
+            "direction": "inbound",
+            "occurred_at": "2026-05-06T12:20:05",
+            "subject": "Contact form (Dentures & Partials)",
+            "body": DAVIS_BROWN_BODY,
+            "external_refs_json": {"ip_address": "106.219.155.100"},
+        },
+    )
+    assert resp.status_code == 422, resp.text
+

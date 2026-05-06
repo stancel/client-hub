@@ -10,12 +10,13 @@
 - **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
-- **Version:** 0.3.6 (single source of truth: `api/VERSION`; FastAPI
+- **Version:** 0.4.0 (single source of truth: `api/VERSION`; FastAPI
   reads it at startup; SDKs stamped via `scripts/generate-sdks.sh`;
   git tagged `vX.Y.Z`)
 - **Schema:** 39 tables + 3 views in `clienthub` (3NF; through
-  migration 029)
-- **API:** 37 endpoint paths, 180 tests passing
+  migration 031 — adds `spam_events.peer_ip` and seeds SEO-outreach
+  patterns)
+- **API:** 37 endpoint paths, 217 tests passing
 - **SDKs:** Python, PHP, TypeScript (auto-generated). The TypeScript
   SDK is published to the private npm registry as
   `@bradstancel/clienthub-sdk` on `https://npm.onlinesalessystems.com/`
@@ -142,7 +143,15 @@ client-hub/
 
 **Spam-defense framework:** every public-ish endpoint inherits a 5-line spam guard via `app.services.spam_filter_service.spam_check_or_raise`. Patterns are DB-driven (`spam_patterns` table, 57 seeded across migrations 023 + 024), rejections logged to `spam_events`, sliding-window rate-limit (10 min window) in `spam_rate_log` with per-key thresholds: `email=1`, `email_body_hash=1`, `ip=5`. Soft-signal events (single-phrase grazes below the rejection threshold) are logged as `rejection_reason='soft_signal'` for operator review without rejection. See `docs/Spam-Defense-Pattern.rst` for the inheritance pattern when adding new integrations.
 
-**Canonical client IP capture:** any ingest adapter must call `app.services.request_meta.extract_request_meta(request, payload_external_refs=...)` instead of reading `request.client.host` directly. Precedence: payload `external_refs_json.ip_address` (most-trusted for source-key endpoints — consumer Next.js sites embed the real visitor IP from `CF-Connecting-IP`), then `request.client.host` (now correct because uvicorn launches with `--proxy-headers --forwarded-allow-ips '*'` to honor Caddy's X-Forwarded-For). Private/loopback/link-local addresses are rejected at every layer so docker bridge IPs and `127.0.0.1` never reach the audit log.
+**Canonical client IP capture (v0.4.0+):** any ingest adapter must call `app.services.request_meta.extract_request_meta(request, payload_external_refs=...)` instead of reading `request.client.host` directly. Returns a 3-tuple `(canonical_ip, peer_ip, user_agent)`:
+
+- `canonical_ip` — best-known *visitor* IP. Public-only, used for rate-limit keying and `spam_events.remote_ip`. Precedence: payload `external_refs_json.ip_address` (most-trusted for source-key endpoints — consumer Next.js sites embed the real visitor IP from `CF-Connecting-IP`), then `request.client.host` if public.
+- `peer_ip` — raw TCP peer (`request.client.host`), kept even if private/loopback. Forensic only; recorded to `spam_events.peer_ip`. Tells us whether traffic relayed through a consumer-site droplet vs came direct.
+- `user_agent` — payload UA → request UA.
+
+Private/loopback/link-local addresses are excluded from `canonical_ip` (so docker bridge IPs and `127.0.0.1` never reach the rate-limit log), but preserved on `peer_ip` for forensics. The `/api/v1/communications` endpoint also pulls the parent contact's stored `external_refs_json.ip_address` as a fallback when the comm payload doesn't carry one — fixes a v0.3.6 defect where consumer-site droplet IPs landed in `remote_ip` because comm payloads omitted `externalRefsJson`.
+
+**NANP area-code validation (v0.4.0+):** `app.services.phone_utils.is_valid_nanp_area_code(area)` checks the 3-digit NPA against a frozenset of every NANP-assigned area code (sourced from NANPA's public registry). The spam filter rejects unassigned NPAs with `rejection_reason='phone_invalid_areacode'`. Catches the v0.3.6 breakthrough case (`+12356895054` — area code 235 isn't assigned) that passed both the digit-count check and the `+235` country-block (the `+1` prefix masks it as domestic).
 
 **Phone-number storage (v0.3.0+):** every phone number in `contact_phones.phone_number` and `org_phones.phone_number` is stored in **E.164** format (`+15558675309`) and protected by a DB-level CHECK constraint. Normalization happens at the API boundary via `app.services.phone_utils.normalize_to_e164`, which is wired into the Pydantic `ContactCreatePhone.number` validator. The `GET /api/v1/lookup/phone/{number}` endpoint normalizes the path parameter the same way, so SIP/CTI callers can pass any common format and resolve to the canonical row. Consumer sites do not need to format phones — submit whatever the form collects.
 

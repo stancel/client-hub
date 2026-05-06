@@ -63,7 +63,7 @@ def test_is_public_ip_rejects_private_loopback_link_local():
 def test_extract_request_meta_prefers_payload_public_ip():
     req = _make_request(peer_ip="172.18.0.4", ua="caddy/2")
     refs = {"ip_address": "8.8.8.8", "user_agent": "Mozilla/5.0 RealVisitor"}
-    ip, ua = extract_request_meta(req, payload_external_refs=refs)
+    ip, peer_ip, ua = extract_request_meta(req, payload_external_refs=refs)
     assert ip == "8.8.8.8"
     assert ua == "Mozilla/5.0 RealVisitor"
 
@@ -71,23 +71,42 @@ def test_extract_request_meta_prefers_payload_public_ip():
 def test_extract_request_meta_falls_back_when_payload_ip_is_private():
     req = _make_request(peer_ip="8.8.4.4", ua="pytest/1.0")
     refs = {"ip_address": "10.0.0.1"}  # private — must be rejected
-    ip, ua = extract_request_meta(req, payload_external_refs=refs)
+    ip, peer_ip, ua = extract_request_meta(req, payload_external_refs=refs)
     assert ip == "8.8.4.4"
     assert ua == "pytest/1.0"
 
 
 def test_extract_request_meta_no_payload_uses_request_peer():
     req = _make_request(peer_ip="9.9.9.9")
-    ip, ua = extract_request_meta(req, payload_external_refs=None)
+    ip, peer_ip, ua = extract_request_meta(req, payload_external_refs=None)
     assert ip == "9.9.9.9"
+    assert peer_ip == "9.9.9.9"
     assert ua == "pytest/1.0"
 
 
 def test_extract_request_meta_no_client_no_payload_returns_none():
     req = _make_request(peer_ip=None, ua=None)
-    ip, ua = extract_request_meta(req, payload_external_refs=None)
+    ip, peer_ip, ua = extract_request_meta(req, payload_external_refs=None)
     assert ip is None
+    assert peer_ip is None
     assert ua is None
+
+
+def test_extract_request_meta_returns_peer_ip_even_when_private():
+    """Private peer must be excluded from canonical IP but kept as peer_ip
+    so spam_events.peer_ip preserves the raw TCP-level forensic record."""
+    req = _make_request(peer_ip="172.18.0.4", ua="caddy/2")
+    refs = {"ip_address": "8.8.8.8"}
+    canonical, peer, _ua = extract_request_meta(req, payload_external_refs=refs)
+    assert canonical == "8.8.8.8"
+    assert peer == "172.18.0.4"
+
+
+def test_extract_request_meta_canonical_none_when_only_private_peer():
+    req = _make_request(peer_ip="10.0.0.1", ua="caddy/2")
+    canonical, peer, _ua = extract_request_meta(req, payload_external_refs=None)
+    assert canonical is None
+    assert peer == "10.0.0.1"
 
 
 # =============================================================================

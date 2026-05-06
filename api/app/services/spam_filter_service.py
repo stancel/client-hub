@@ -30,6 +30,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.source import Source
 from app.models.spam import SpamEvent, SpamPattern
+from app.services.phone_utils import (
+    extract_nanp_area_code,
+    is_valid_nanp_area_code,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +61,19 @@ RATE_LIMIT_THRESHOLDS: dict[str, int] = {
 # =============================================================================
 @dataclass
 class IntakePayload:
-    """Normalized intake — every integration adapter produces one of these."""
+    """Normalized intake — every integration adapter produces one of these.
+
+    ``remote_ip`` is the canonical visitor IP (used for rate-limit keying
+    and ``spam_events.remote_ip``). ``peer_ip`` is the raw TCP peer
+    (logged separately to ``spam_events.peer_ip`` for forensics, never
+    used for rate-limit keying). See ``app.services.request_meta``.
+    """
 
     email: str | None
     phone: str | None
     body: str | None
     remote_ip: str | None = None
+    peer_ip: str | None = None
     user_agent: str | None = None
 
 
@@ -167,10 +178,24 @@ def _body_hash(body: str | None) -> str | None:
     return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
 
 
-async def _is_rate_limited(db: AsyncSession, intake: IntakePayload) -> bool:
-    """Check email / email||body_hash / IP keys against per-type thresholds."""
+async def _is_rate_limited(
+    db: AsyncSession,
+    intake: IntakePayload,
+    *,
+    skip_email_keys: bool = False,
+) -> bool:
+    """Check email / email||body_hash / IP keys against per-type thresholds.
+
+    ``skip_email_keys=True`` is used by the /communications endpoint —
+    a comm is a follow-up to a parent contact, and the contact-create
+    has already paid the email rate-log cost. Counting the comm as a
+    second hit would block the legitimate
+    ``logConversion(contact + comm)`` consumer-site flow. Email
+    *pattern matching* (substring/full-block checks) still runs; only
+    rate-limit keying skips the email keys.
+    """
     keys: list[tuple[str, str]] = []
-    if intake.email:
+    if intake.email and not skip_email_keys:
         keys.append(("email", intake.email.lower()))
         bh = _body_hash(intake.body)
         if bh:
@@ -195,7 +220,11 @@ async def _is_rate_limited(db: AsyncSession, intake: IntakePayload) -> bool:
 
 
 async def _record_rate_log(
-    db: AsyncSession, intake: IntakePayload, *, source_id: int | None = None
+    db: AsyncSession,
+    intake: IntakePayload,
+    *,
+    source_id: int | None = None,
+    skip_email_keys: bool = False,
 ) -> None:
     """Stamp the rate-log so future submissions can see this happened.
 
@@ -205,9 +234,14 @@ async def _record_rate_log(
     A row is recorded for every available key (email, email||body_hash, ip),
     not only when an email is present — IP-only traffic (e.g. communications
     posts that carry no email) still needs a rate-limit footprint.
+
+    ``skip_email_keys`` mirrors the same flag on ``_is_rate_limited`` —
+    set by the /communications endpoint so a comm follow-up doesn't
+    write a duplicate email row that would lock out future
+    contact-create attempts for the same address.
     """
     rows: list[dict[str, Any]] = []
-    if intake.email:
+    if intake.email and not skip_email_keys:
         rows.append({"kt": "email", "kv": intake.email.lower()})
         bh = _body_hash(intake.body)
         if bh:
@@ -245,7 +279,10 @@ async def _record_rate_log(
 # Core evaluator
 # =============================================================================
 async def evaluate_intake(
-    db: AsyncSession, intake: IntakePayload
+    db: AsyncSession,
+    intake: IntakePayload,
+    *,
+    skip_email_rate_limit: bool = False,
 ) -> tuple[SpamVerdict | None, SpamPattern | None]:
     """Return ``(verdict, soft_signal_match)``.
 
@@ -267,6 +304,23 @@ async def evaluate_intake(
             ),
             None,
         )
+
+    # 1b) NANP area-code validation — rejects digits-look-US numbers whose
+    # area code (NPA) isn't actually assigned. Catches the v0.3.6
+    # breakthrough where '+12356895054' passed the digit-count check but
+    # area code 235 doesn't exist. The country-block substring check below
+    # cannot catch this because '+1...' looks domestic.
+    if intake.phone is not None:
+        area = extract_nanp_area_code(intake.phone)
+        if area is not None and not is_valid_nanp_area_code(area):
+            return (
+                SpamVerdict(
+                    rejection_reason="phone_invalid_areacode",
+                    matched_pattern_id=None,
+                    matched_pattern_text=area,
+                ),
+                None,
+            )
 
     patterns = await _load_active_patterns(db)
 
@@ -317,7 +371,7 @@ async def evaluate_intake(
         )
 
     # 6) Rate-limit check (last — so phone/email/body match first for clearer signal)
-    if await _is_rate_limited(db, intake):
+    if await _is_rate_limited(db, intake, skip_email_keys=skip_email_rate_limit):
         return (
             SpamVerdict(
                 rejection_reason="rate_limit",
@@ -353,6 +407,7 @@ async def _record_spam_event(
         endpoint=endpoint,
         integration_kind=integration_kind,
         remote_ip=intake.remote_ip,
+        peer_ip=intake.peer_ip,
         user_agent=intake.user_agent,
         submitted_email=intake.email,
         submitted_phone=intake.phone,
@@ -397,6 +452,7 @@ async def _record_soft_signal(
         endpoint=endpoint,
         integration_kind=integration_kind,
         remote_ip=intake.remote_ip,
+        peer_ip=intake.peer_ip,
         user_agent=intake.user_agent,
         submitted_email=intake.email,
         submitted_phone=intake.phone,
@@ -420,6 +476,7 @@ async def spam_check_or_raise(
     endpoint: str,
     integration_kind: str,
     payload: dict[str, Any] | None = None,
+    skip_email_rate_limit: bool = False,
 ) -> None:
     """Evaluate intake; raise HTTPException(422) on spam, otherwise no-op.
 
@@ -428,8 +485,16 @@ async def spam_check_or_raise(
     matched pattern's hit_count. On a clean-but-suspicious payload (one phrase
     match, below threshold) also writes a 'soft_signal' spam_event for
     operator review.
+
+    ``skip_email_rate_limit`` is set by the /communications endpoint so the
+    follow-up comm in a normal ``logConversion(contact + comm)`` flow
+    doesn't trip the email rate-limit (the contact-create has already
+    written the email's rate-log row). Email *pattern matching* still
+    runs — only rate-limit keying skips email keys.
     """
-    verdict, soft_signal = await evaluate_intake(db, intake)
+    verdict, soft_signal = await evaluate_intake(
+        db, intake, skip_email_rate_limit=skip_email_rate_limit
+    )
     if verdict is not None:
         await _record_spam_event(
             db,
@@ -457,7 +522,9 @@ async def spam_check_or_raise(
             integration_kind=integration_kind,
             payload=payload,
         )
-    await _record_rate_log(db, intake, source_id=source_id)
+    await _record_rate_log(
+        db, intake, source_id=source_id, skip_email_keys=skip_email_rate_limit
+    )
     await db.commit()
 
 
@@ -661,6 +728,7 @@ def _serialize_event(
         "endpoint": ev.endpoint,
         "integration_kind": ev.integration_kind,
         "remote_ip": ev.remote_ip,
+        "peer_ip": ev.peer_ip,
         "user_agent": ev.user_agent,
         "submitted_email": ev.submitted_email,
         "submitted_phone": ev.submitted_phone,

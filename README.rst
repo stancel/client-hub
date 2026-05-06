@@ -114,14 +114,16 @@ Quick Info
    * - **DB Name**
      - ``clienthub``
    * - **Version**
-     - 0.3.6 (single source of truth: ``api/VERSION``;
+     - 0.4.0 (single source of truth: ``api/VERSION``;
        git-tagged ``vX.Y.Z`` per release)
    * - **Schema**
-     - 39 tables + 3 views (3NF normalized; through migration 029)
+     - 39 tables + 3 views (3NF normalized; through migration 031,
+       which adds ``spam_events.peer_ip`` and seeds SEO-outreach
+       patterns)
    * - **API Endpoints**
      - 37 paths across 13 routers
    * - **Test Suite**
-     - 180 tests across 22 files
+     - 217 tests across 24 files
    * - **SDKs**
      - Python, PHP, TypeScript (auto-generated from OpenAPI). The
        TypeScript SDK is published to Verdaccio as
@@ -136,7 +138,8 @@ Quick Info
    * - **MCP Tools**
      - ``apisix-mysql`` (``execute_sql``, ``search_objects``)
    * - **Production deployments**
-     - Two instances live on v0.3.6:
+     - Two instances; v0.4.0 rolls out via
+       ``scripts/deploy-all-vpses.sh``:
        ``client-hub-complete-dental-care.onlinesalessystems.com``
        (Complete Dental Care) and
        ``client-hub-clever-orchid.onlinesalessystems.com``
@@ -144,9 +147,14 @@ Quick Info
    * - **Status**
      - All phases through 16 complete. Two live integrations
        running (Complete Dental Care and Clever Orchid Next.js
-       sites). Both VPSes carry the v0.3.x hardening: phone E.164
-       normalization, marketing-source attribution, source-discipline
-       enforcement, business_settings populated.
+       sites). v0.4.0 adds canonical visitor-IP capture
+       (``spam_events.peer_ip``), NANP area-code validation,
+       SEO-outreach pattern seeds, and a comm-endpoint
+       parent-contact email + IP fallback driven by a 2026-05-06
+       breakthrough audit. Both VPSes also carry the v0.3.x
+       hardening: phone E.164 normalization, marketing-source
+       attribution, source-discipline enforcement,
+       business_settings populated.
 
 .. _client-hub-architecture-summary:
 

@@ -631,6 +631,106 @@ Phase 16 — v0.3.6 follow-ups [COMPLETE]
   specific gaps that site needs to close to converge on the
   canonical, plus the universal ``Promise<any>``-cast removal.
 
+.. _client-hub-todo-phase16-v0-4-0:
+
+Phase 16 — v0.4.0 follow-ups [COMPLETE]
+----------------------------------------------------------------------
+
+Driven by a 2026-05-06 production audit on
+``client-hub-complete-dental-care.onlinesalessystems.com`` after a
+SEO-pitch from "Davis Brown" (``davisseowebexpert@gmail.com``,
+phone ``+12356895054`` — fake NANP area code 235, India IP
+``106.219.155.100``) made it through to ``contacts`` (id 29) and
+``communications`` (id 33). Investigation surfaced four real
+defects, all fixed here.
+
+- [x] Migration 030 — ``spam_events.peer_ip VARCHAR(45)`` column,
+  indexes on ``remote_ip`` and ``peer_ip``. Splits canonical
+  visitor IP from raw TCP peer so ``remote_ip`` is the queryable
+  authoritative visitor IP and ``peer_ip`` records the proxy
+  droplet for forensics.
+- [x] Migration 031 — seed 5 new ``email_substring`` patterns
+  (``seowebexpert``, ``webexpert``, ``webexpertsolution``,
+  ``seoanalyst``, ``seospecialist``) and 7 new whitespace-tolerant
+  ``phrase_regex`` patterns (``\\bdrop\\s+in\\s+website\\s+traffic\\b``,
+  ``\\berrors\\s+and\\s+(the\\s+)?solutions\\b``,
+  ``\\bimprove\\s+the\\s+performance\\s+and\\s+traffic\\b``, etc.)
+  covering the SEO-outreach body shape. The ``\\s+`` tolerance is
+  deliberate — the original migration-023 phrase used a literal
+  space and was defeated by a double-space in the breakthrough
+  body.
+- [x] ``app/services/phone_utils.py`` — ``NANP_AREA_CODES``
+  frozenset (~400 NPAs from `NANPA's public registry
+  <https://nationalnanpa.com/reports/reports_npa.html>`_),
+  ``is_valid_nanp_area_code(area)``, and
+  ``extract_nanp_area_code(phone)`` helpers. Refresh annually.
+- [x] ``app/services/spam_filter_service.py`` — new
+  ``phone_invalid_areacode`` rule in ``evaluate_intake`` (between
+  the digit-count check and the country-block patterns). Catches
+  ``+12356895054`` which passed the digit count and which the
+  ``+235`` country-block substring couldn't match because of the
+  ``+1`` prefix. Pattern-level addition to ``IntakePayload``:
+  ``peer_ip`` field; both ``_record_spam_event`` and
+  ``_record_soft_signal`` now write ``spam_events.peer_ip``.
+  ``_serialize_event`` exposes ``peer_ip`` separately in admin
+  responses.
+- [x] ``app/services/spam_filter_service.py`` —
+  ``spam_check_or_raise`` gained a ``skip_email_rate_limit`` flag.
+  The /communications endpoint sets it to True so the standard
+  ``logConversion(contact + comm)`` consumer flow doesn't trip
+  the email rate-limit (the contact-create has already written the
+  email's rate-log row; counting the comm as a 2nd hit was
+  blocking legitimate follow-ups). Email *pattern matching* still
+  runs; only rate-limit keying skips the email keys.
+- [x] ``app/services/request_meta.py`` — ``extract_request_meta``
+  now returns a 3-tuple ``(canonical_ip, peer_ip, user_agent)``.
+  Canonical IP is the public visitor IP (payload
+  ``external_refs_json.ip_address`` if public → ``request.client.host``
+  if public). Peer IP is the raw TCP peer kept for forensics
+  (preserved even when private/loopback).
+- [x] ``app/routers/communications.py`` — comm endpoint now looks
+  up the parent contact's primary email and stored
+  ``external_refs_json.ip_address`` and uses them as fallbacks.
+  This means: (a) ``submitted_email`` is non-NULL on comm
+  ``spam_events`` rows (was always NULL before) so email-substring
+  patterns can fire on follow-ups, and (b) the canonical visitor
+  IP propagates from the contact-create even when the comm
+  payload itself doesn't carry one (consumer sites still on
+  v0.3.6 SDK get correct IP forensics automatically).
+- [x] ``app/routers/contacts.py`` and ``app/routers/webhooks.py`` —
+  consume the new 3-tuple from ``extract_request_meta``; pass
+  ``peer_ip`` into ``IntakePayload``.
+- [x] Tests: ``tests/test_spam_filter_nanp.py`` (new, 31 cases) —
+  ``extract_nanp_area_code`` + ``is_valid_nanp_area_code`` units
+  + end-to-end NANP rejection;
+  ``tests/test_communications_parent_lookup.py`` (new, 2 cases)
+  — comm uses parent email + IP fallback, comm payload IP wins
+  over fallback; ``tests/test_spam_ip_capture.py`` updated for
+  the 3-tuple contract + new cases for peer_ip preservation;
+  ``tests/test_spam_filter.py`` extended with the Davis Brown
+  email-substring + body phrase-combo end-to-end rejections.
+  Test count 180 → 217.
+- [x] Handoff prompts: ``docs/handoffs/cdc-v0.4.0.md`` and
+  ``docs/handoffs/clever-orchid-v0.4.0.md`` — both consumer sites
+  need to (1) bump to ``@bradstancel/clienthub-sdk@^0.4.0``,
+  (2) add ``externalRefsJson`` to the ``createCommunicationApiV1Communications``
+  call in ``logConversion`` and ``appendCommunication``, and
+  (3) mirror the ``NANP_AREA_CODES`` set into ``lib/spam-filter.ts``
+  with an ``isValidNanpAreaCode`` helper wired into form-submit
+  pre-validation. Adoption on each consumer's own schedule.
+- [ ] **TODO:** confirm CDC and Clever Orchid each adopt the
+  v0.4.0 handoff. After both confirm, update
+  ``docs/Cross-Project-Integration.rst`` reference module to
+  include ``externalRefsJson`` on the comm call (the canonical
+  module currently reflects the v0.3.6 surface).
+- [ ] **TODO:** annual NANPA registry refresh — re-pull
+  ``NANP_AREA_CODES`` from the assignment registry and diff
+  against the in-code list. Calendar reminder for 2027-05.
+- [ ] **TODO:** post-deploy cleanup of the original CDC
+  breakthrough — soft-delete ``contacts.id=29`` + leave
+  ``communications.id=33`` intact for pattern-tuning forensics;
+  insert a backdated ``spam_events`` row for the audit trail.
+
 .. _client-hub-todo-v0-3-7-queue:
 
 v0.3.7 queue (next time we cut a versioned release)

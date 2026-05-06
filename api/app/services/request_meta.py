@@ -47,20 +47,29 @@ def extract_request_meta(
     request: Request,
     *,
     payload_external_refs: dict[str, Any] | None = None,
-) -> tuple[str | None, str | None]:
-    """Return ``(client_ip, user_agent)`` using the most trustworthy source.
+) -> tuple[str | None, str | None, str | None]:
+    """Return ``(canonical_ip, peer_ip, user_agent)``.
 
-    Precedence for IP:
+    Two distinct IP notions are returned so callers can record both in
+    ``spam_events`` and never confuse "where the visitor came from" with
+    "what hit our edge":
 
-    1. ``payload_external_refs["ip_address"]`` if it parses as a public IP.
-       This is what consumer Next.js sites send after pulling
-       ``CF-Connecting-IP`` server-side.
-    2. ``request.client.host`` (uvicorn ``--proxy-headers`` makes this honor
-       Caddy's X-Forwarded-For). Returned as-is even for private values, so
-       webhook/dev-loop traffic still has *something* recorded.
-    3. ``None``.
+    - ``canonical_ip`` — best-known public *visitor* IP. Used for rate-
+      limit keying and the ``spam_events.remote_ip`` audit column.
+      Precedence: ``payload_external_refs["ip_address"]`` if public →
+      ``request.client.host`` if public → ``None``.
+    - ``peer_ip`` — raw TCP peer (``request.client.host``), kept even
+      if private/loopback. Recorded to ``spam_events.peer_ip`` for
+      forensics, never used for rate-limit keying. Tells us whether
+      a submission relayed through one of our consumer-site droplets
+      vs. came direct.
+    - ``user_agent`` — payload UA → request UA → ``None``.
 
-    Same precedence for User-Agent.
+    The split fixes a v0.3.6 bug where the consumer-site droplet IP
+    landed in ``remote_ip`` because the comm payload didn't carry
+    ``ip_address``. Now even in that case ``canonical_ip`` is None
+    (caller falls back to parent-contact lookup) and ``peer_ip``
+    captures the droplet for forensics.
     """
     payload_ip: str | None = None
     payload_ua: str | None = None
@@ -72,16 +81,19 @@ def extract_request_meta(
         if isinstance(raw_ua, str) and raw_ua.strip():
             payload_ua = raw_ua.strip()[:255]
 
-    request_ip = request.client.host if request.client else None
-    # Drop the request peer too if it's not a public client IP. Private peers
-    # show up in two places: (a) docker bridge addresses when --proxy-headers
-    # isn't honored (the original bug); (b) ``127.0.0.1`` from the httpx test
-    # client. Recording either as the IP rate-limit key bunches all such
-    # traffic onto the same row and the rate-limit fires for unrelated calls.
-    if request_ip and not _is_public_ip(request_ip):
-        request_ip = None
+    raw_peer = request.client.host if request.client else None
+    peer_ip = raw_peer.strip() if raw_peer else None
+
+    # canonical IP excludes private/loopback peers — those are docker
+    # bridge addresses or test-client localhost, never a real visitor.
+    canonical_request_ip = peer_ip if peer_ip and _is_public_ip(peer_ip) else None
+
     request_ua = request.headers.get("user-agent")
     if request_ua:
         request_ua = request_ua.strip()[:255] or None
 
-    return (payload_ip or request_ip, payload_ua or request_ua)
+    return (
+        payload_ip or canonical_request_ip,
+        peer_ip,
+        payload_ua or request_ua,
+    )

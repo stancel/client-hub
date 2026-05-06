@@ -14,7 +14,7 @@
 """  # noqa: E501
 
 
-__version__ = "0.3.6"
+__version__ = "0.4.0"
 
 # import apis into sdk package
 from clienthub.api.admin_api import AdminApi

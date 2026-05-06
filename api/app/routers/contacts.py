@@ -49,14 +49,15 @@ def _extract_contact_intake(body: ContactCreate, request: Request) -> IntakePayl
             v = extra.get(k)
             if v:
                 synth_body_parts.append(str(v))
-    ip, ua = extract_request_meta(
+    canonical_ip, peer_ip, ua = extract_request_meta(
         request, payload_external_refs=body.external_refs_json
     )
     return IntakePayload(
         email=first_email,
         phone=first_phone,
         body=" ".join(p for p in synth_body_parts if p),
-        remote_ip=ip,
+        remote_ip=canonical_ip,
+        peer_ip=peer_ip,
         user_agent=ua,
     )
 

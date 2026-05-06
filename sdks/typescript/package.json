@@ -1,6 +1,6 @@
 {
   "name": "@bradstancel/clienthub-sdk",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "TypeScript SDK for the Client Hub data-first customer intelligence API. Auto-generated from the OpenAPI spec on every release; do not edit by hand.",
   "author": "Brad Stancel <brad@processfast.com>",
   "repository": {

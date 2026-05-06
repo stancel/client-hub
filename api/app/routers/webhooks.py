@@ -90,12 +90,15 @@ async def chatwoot_webhook(
         # Spam guard — Chatwoot widget is public-facing on the consumer
         # site, so messages here can carry the same spam payloads as a
         # plain contact form. Run the filter before any DB write.
-        ip, ua = extract_request_meta(request, payload_external_refs=None)
+        canonical_ip, peer_ip, ua = extract_request_meta(
+            request, payload_external_refs=None
+        )
         intake = IntakePayload(
             email=email,
             phone=phone,
             body=data.get("content"),
-            remote_ip=ip,
+            remote_ip=canonical_ip,
+            peer_ip=peer_ip,
             user_agent=ua,
         )
         await spam_check_or_raise(

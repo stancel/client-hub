@@ -421,10 +421,11 @@ in-process coordination.
 IP Capture & Trust Model
 **********************************************************************
 
-The spam filter records the client IP in two places:
-``spam_rate_log.key_value`` (when the ``ip`` key is recorded) and
-``spam_events.remote_ip`` (when a rejection is logged). Getting
-the *right* IP into those columns is non-trivial because of the
+The spam filter records the client IP in three places:
+``spam_rate_log.key_value`` (when the ``ip`` key is recorded),
+``spam_events.remote_ip`` (canonical visitor IP), and
+``spam_events.peer_ip`` (raw TCP peer, as of v0.4.0). Getting
+the *right* IP into the right column is non-trivial because of the
 deployment topology:
 
 ::
@@ -466,9 +467,94 @@ relaxation in the Dockerfile is safe.
 
 **Adding a new ingest adapter:** any handler that builds an
 ``IntakePayload`` MUST call ``extract_request_meta`` and pass the
-result into ``IntakePayload.remote_ip`` and
-``IntakePayload.user_agent``. Do not read ``request.client.host``
-directly — it bypasses the precedence rules.
+3-tuple result into ``IntakePayload.remote_ip``,
+``IntakePayload.peer_ip``, and ``IntakePayload.user_agent``. Do
+not read ``request.client.host`` directly — it bypasses the
+precedence rules.
+
+.. _client-hub-sdp-visitor-vs-peer:
+
+Visitor IP vs proxy peer (v0.4.0+)
+======================================================================
+
+A v0.3.6 production audit (2026-05-06) found a SEO-pitch
+breakthrough whose ``spam_events.remote_ip`` had recorded the
+consumer-site droplet IP (``134.199.195.114``) instead of the
+real visitor IP (``106.219.155.100``, India). The visitor IP only
+landed inside ``contacts.external_refs_json`` — hard to query,
+hard to filter, useless for forensics.
+
+Migration 030 fixed this by splitting the two notions into
+separate columns:
+
+- ``spam_events.remote_ip`` — best-known canonical *visitor* IP.
+  Public-only, derived via the helper above. This is the field
+  rate-limit keying and analytics treat as authoritative.
+- ``spam_events.peer_ip`` — raw TCP peer
+  (``request.client.host``), kept even if private/loopback.
+  Forensic only; never used for rate-limit keying. Tells us
+  whether a submission relayed through one of our consumer-site
+  droplets vs. came direct.
+
+``extract_request_meta`` returns ``(canonical_ip, peer_ip,
+user_agent)``. Existing rows pre-migration have
+``peer_ip = NULL`` because old data cannot be reliably split into
+canonical-vs-peer.
+
+The ``/api/v1/communications`` endpoint also gained a
+parent-contact lookup in v0.4.0: when ``CommCreate`` references a
+contact whose stored ``external_refs_json.ip_address`` is public,
+that IP is used as a *fallback* for ``remote_ip`` when the comm
+payload itself doesn't carry one. This means consumer sites that
+haven't yet adopted the v0.4.0 SDK contract (which always sends
+``externalRefsJson`` on the comm) still produce correct IP
+forensics — Client Hub fills in the gap from the contact-create
+that just happened.
+
+.. _client-hub-sdp-phone-validation:
+
+Phone validation: digit count vs NANP area code (v0.4.0+)
+======================================================================
+
+Up through v0.3.6 the spam filter validated phones two ways:
+
+1. ``app/services/phone_utils.py::is_valid_us_phone`` — counts
+   digits (10 or 11 with leading 1).
+2. ``phone_country_block`` patterns — substring match against the
+   raw phone (e.g. ``+235`` for Cameroon).
+
+The 2026-05-06 breakthrough used ``+12356895054``: 11 digits with
+leading 1 (passes count), and ``+235`` does NOT substring-match
+``+12356895054`` because the literal ``+`` sits at index 0 next to
+``1``, not ``2``. The disguise — a fake number wearing US
+clothes — slipped past both checks.
+
+v0.4.0 adds a third check between the two:
+
+- ``app/services/phone_utils.py::is_valid_nanp_area_code(area)``
+  consults a ``frozenset`` of every NANP-assigned NPA (sourced
+  from `NANPA's public assignment registry
+  <https://nationalnanpa.com/reports/reports_npa.html>`_).
+- ``evaluate_intake`` extracts the NPA from any 10-or-11-digit
+  US-shape phone and rejects with
+  ``rejection_reason='phone_invalid_areacode'`` (and the matched
+  area code in ``matched_pattern_text``) when it isn't in the
+  list.
+
+Refresh the ``NANP_AREA_CODES`` frozenset annually. Additions are
+rare (last new code: 2024) but the registry does grow. The list
+deliberately includes ``555`` so test fixtures using
+``(555) NNN-XXXX`` style phones don't false-reject — real
+subscribers don't carry 555 numbers, and other rules
+(``phone_country_block``, phrase patterns) catch any actual
+abusive use. Other special service codes (N11 like 411/911, plus
+000 and 999) are excluded.
+
+Consumer Next.js sites mirror the same list in
+``lib/spam-filter.ts::isValidNanpAreaCode`` so the rejection
+happens at the website edge before a Client Hub round-trip. See
+the v0.4.0 handoff prompts under ``docs/handoffs/`` for the
+adoption pattern.
 
 .. _client-hub-sdp-soft-signal:
 

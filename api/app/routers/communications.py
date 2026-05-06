@@ -1,3 +1,4 @@
+import json
 import uuid as uuid_mod
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -13,7 +14,7 @@ from app.models.contact import Contact
 from app.models.lookups import ChannelType
 from app.models.order import Order
 from app.models.source import Source
-from app.services.request_meta import extract_request_meta
+from app.services.request_meta import _is_public_ip, extract_request_meta
 from app.services.spam_filter_service import (
     IntakePayload,
     spam_check_or_raise,
@@ -103,18 +104,55 @@ async def create_communication(
     ctx: SourceContext = Depends(require_api_key),
     db: AsyncSession = Depends(get_db),
 ):
-    # Run the spam guard against the body's text fields BEFORE we touch the DB.
-    # We don't have email/phone on a CommCreate (the contact is referenced by
-    # uuid), so the filter only sees `body` content + IP — but that's enough
-    # for url/phrase patterns and rate-limit on body_hash.
-    ip, ua = extract_request_meta(
+    # Run the spam guard BEFORE any DB write. CommCreate references the
+    # parent contact by uuid (no email/phone on the comm itself), so we
+    # look the parent up first and pull its primary email + stored
+    # ip_address out of external_refs_json. This means:
+    #   - submitted_email is recorded on spam_events (not NULL),
+    #     which lets email-substring patterns and email rate-limits
+    #     fire on follow-up communications from a known spam address.
+    #   - canonical visitor IP propagates from the contact-create call
+    #     even when the comm payload itself doesn't carry it (consumer
+    #     sites that haven't yet adopted the v0.4.0 SDK contract still
+    #     get correct IP forensics).
+    contact = (await db.execute(
+        select(Contact)
+        .options(selectinload(Contact.emails))
+        .where(Contact.uuid == body.contact_uuid)
+    )).scalar_one_or_none()
+    if not contact:
+        raise HTTPException(status_code=400, detail=f"Contact {body.contact_uuid} not found")
+
+    parent_email: str | None = None
+    primary_email = next(
+        (e for e in contact.emails if e.is_primary), None
+    ) or next(iter(contact.emails), None)
+    if primary_email is not None:
+        parent_email = primary_email.email_address
+
+    parent_ip_fallback: str | None = None
+    if contact.external_refs_json:
+        try:
+            refs = (
+                contact.external_refs_json
+                if isinstance(contact.external_refs_json, dict)
+                else json.loads(contact.external_refs_json)
+            )
+            stored_ip = refs.get("ip_address") if isinstance(refs, dict) else None
+            if isinstance(stored_ip, str) and _is_public_ip(stored_ip):
+                parent_ip_fallback = stored_ip.strip()
+        except (TypeError, ValueError):
+            parent_ip_fallback = None
+
+    canonical_ip, peer_ip, ua = extract_request_meta(
         request, payload_external_refs=body.external_refs_json
     )
     intake = IntakePayload(
-        email=None,
+        email=parent_email,
         phone=None,
         body=body.body,
-        remote_ip=ip,
+        remote_ip=canonical_ip or parent_ip_fallback,
+        peer_ip=peer_ip,
         user_agent=ua,
     )
     await spam_check_or_raise(
@@ -123,11 +161,11 @@ async def create_communication(
         endpoint="/api/v1/communications",
         integration_kind="web_form",
         payload=body.model_dump(mode="json"),
+        # The parent contact-create has already written the email's
+        # rate-log row; counting this comm as a 2nd email-hit would
+        # block the standard logConversion(contact+comm) consumer flow.
+        skip_email_rate_limit=True,
     )
-
-    contact = (await db.execute(select(Contact).where(Contact.uuid == body.contact_uuid))).scalar_one_or_none()
-    if not contact:
-        raise HTTPException(status_code=400, detail=f"Contact {body.contact_uuid} not found")
 
     channel = (await db.execute(select(ChannelType).where(ChannelType.code == body.channel))).scalar_one_or_none()
     if not channel:

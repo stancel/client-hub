@@ -24,7 +24,7 @@ async def test_chatwoot_message_unknown_contact(client, auth_headers):
         "data": {
             "id": "CW-TEST-002",
             "content": "Hello from unknown",
-            "sender": {"phone_number": "+19999999999"},
+            "sender": {"phone_number": "+18035559999"},
         },
     })
     assert resp.status_code == 200

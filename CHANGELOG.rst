@@ -4,6 +4,104 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-v0-4-0:
+
+v0.4.0 — 2026-05-06 — Canonical visitor IP, NANP area-code validation, SEO-pitch hardening
+===========================================================================================
+
+Driven by a v0.3.6 production audit on Complete Dental Care
+(``client-hub-complete-dental-care.onlinesalessystems.com``) where a
+SEO-pitch from "Davis Brown" (``davisseowebexpert@gmail.com``, phone
+``+12356895054``, body opening *"Re: Drop Traffic / Hello Good
+Morning, ... drop in website  traffic ..."*) made it through to
+``contacts`` (id 29) and ``communications`` (id 33). Investigation
+surfaced four real defects, all addressed here.
+
+**1. Canonical visitor IP vs. peer IP — proper separation.** The
+existing ``spam_events.remote_ip`` recorded the consumer-site
+droplet IP (``134.199.195.114``) instead of the real visitor IP
+(``106.219.155.100``, India). The visitor IP only landed inside
+``contacts.external_refs_json`` — hard to query, hard to filter,
+useless for forensics. Migration ``030_spam_events_peer_ip.sql``
+adds a new ``peer_ip VARCHAR(45)`` column alongside indexes on
+both. ``app/services/request_meta.py::extract_request_meta`` now
+returns a 3-tuple ``(canonical_ip, peer_ip, user_agent)`` — the
+canonical IP is the best-known *visitor* IP (payload
+``external_refs_json.ip_address`` if public, else
+``request.client.host`` if public), the peer IP is the raw TCP
+peer kept for forensics. Every router call site
+(``contacts.py``, ``communications.py``, ``webhooks.py``) was
+updated; ``spam_filter_service.IntakePayload`` gained a
+``peer_ip`` field; both ``_record_spam_event`` and
+``_record_soft_signal`` now write both columns.
+
+**2. /communications endpoint — parent-contact email + IP fallback.**
+``CommCreate`` references the parent contact by uuid and carries
+no email/phone. Previously the spam check ran with ``email=None``
+which (a) zeroed out a strong signal (the same email had just
+been flagged on the contact create) and (b) left
+``submitted_email = NULL`` on the ``spam_events`` row. The endpoint
+now looks up the parent contact's primary email and uses it as the
+intake email. It also pulls the parent's
+``external_refs_json.ip_address`` as a fallback for ``remote_ip``,
+so consumer sites that haven't yet adopted the v0.4.0 SDK contract
+(which adds ``CommCreate.external_refs_json``) still produce
+correct IP forensics.
+
+**3. NANP area-code validation.** ``+12356895054`` passed the
+existing 10-digit count check and the ``+235`` country-block
+substring (the leading ``+1`` makes it look domestic). New
+``app/services/phone_utils.py::is_valid_nanp_area_code`` checks
+the 3-digit NPA against a frozenset of every assigned NANP area
+code (sourced from `https://nationalnanpa.com/reports/reports_npa.html
+<https://nationalnanpa.com/reports/reports_npa.html>`_). A new
+``phone_invalid_areacode`` rule in ``evaluate_intake`` rejects
+unassigned NPAs and writes a ``spam_events`` row with the matched
+area code in ``matched_pattern_text`` for analytics. Refresh the
+list annually as NANPA assigns new codes.
+
+**4. New SEO-outreach patterns —**
+``031_seed_seo_spam_patterns.sql``. Adds 5 email-substring
+patterns (``seowebexpert``, ``webexpert``, ``webexpertsolution``,
+``seoanalyst``, ``seospecialist``) and 7 whitespace-tolerant
+phrase regexes covering the Davis Brown body shape (*"drop in
+website traffic"*, *"errors and the solutions"*, *"improve the
+performance and traffic"*, *"correspond to a drop in"*, etc.).
+The whitespace tolerance (``\\s+`` instead of literal space) is
+deliberate — the original phrase pattern from migration 023 was
+defeated by a double-space in the breakthrough body.
+
+**Tests.** ``api/tests/test_spam_filter_nanp.py`` (new) covers
+the helper functions and the end-to-end NANP rejection path.
+``api/tests/test_communications_parent_lookup.py`` (new) covers
+the parent-contact email + IP fallback behavior.
+``api/tests/test_spam_filter.py`` extended with two cases that
+re-run the Davis Brown email and body against the live filter.
+``api/tests/test_spam_ip_capture.py`` updated for the new 3-tuple
+``extract_request_meta`` contract; new cases assert ``peer_ip``
+is preserved separately even when the peer is a private/loopback
+address.
+
+**Schema cutover.** Existing ``spam_events`` rows have
+``peer_ip = NULL`` because old data cannot be reliably split into
+canonical-vs-peer. New writes (post-migration) populate both
+columns. Documented in ``docs/Spam-Defense-Pattern.rst``.
+
+**SDK contract.** ``CommCreate`` already exposed
+``external_refs_json``; the consumer Next.js sites simply weren't
+sending it on their ``/communications`` calls. Two new handoff
+prompts under ``docs/handoffs/`` instruct the CDC and Clever
+Orchid sessions to update ``logConversion`` and
+``appendCommunication`` to embed ``externalRefsJson`` (with
+``ip_address`` and ``user_agent``) on the comm call too. Adoption
+on each consumer's own schedule.
+
+**Cleanup.** The original Davis Brown contact (id 29) and
+communication (id 33) on CDC are soft-deleted via a one-off SQL
+run, with a backdated ``spam_events`` row inserted for the audit
+trail. The communication body is intentionally left intact so it
+remains queryable for future pattern tuning.
+
 .. _client-hub-changelog-v0-3-6:
 
 v0.3.6 — 2026-05-05 — Typed LookupResponse, canonical consumer module, deploy orchestrator

@@ -94,8 +94,15 @@ if [[ "$LANGUAGE" == "all" || "$LANGUAGE" == "typescript" ]]; then
     # README with one pointing at the actual private registry.
     ts_dir="$SDK_DIR/typescript"
 
-    jq '. + {
+    # Note: openapi-generator's typescript-fetch template ignores
+    # --additional-properties=packageVersion (a known generator quirk —
+    # python honors it, typescript-fetch does not). We force the
+    # canonical version in via this jq merge so the published SDK
+    # always matches api/VERSION. publish-sdk.yml CI verifies the git
+    # tag matches this field, so a mismatch would block release.
+    jq --arg pkg_version "$PACKAGE_VERSION" '. + {
         name: "@bradstancel/clienthub-sdk",
+        version: $pkg_version,
         description: "TypeScript SDK for the Client Hub data-first customer intelligence API. Auto-generated from the OpenAPI spec on every release; do not edit by hand.",
         author: "Brad Stancel <brad@processfast.com>",
         license: "UNLICENSED",
@@ -202,7 +209,7 @@ Any standard `fetch` option works the same way (`cache`,
 - Spec source: `sdks/openapi.json` in the Client Hub repo
 README_EOF
 
-    echo "  Patched: $ts_dir/package.json (name, repo, publishConfig)"
+    echo "  Patched: $ts_dir/package.json (name, version, repo, publishConfig)"
     echo "  Removed: $ts_dir/.npmignore (was excluding README.md)"
     echo "  Wrote:   $ts_dir/README.md (private-registry install instructions)"
     echo ""
