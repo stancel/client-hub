@@ -6,15 +6,13 @@
 `stancel/complete-dental-care-columbia-website-nextjs`, master
 branch).
 
-**Status:** Client Hub v0.4.0 is being released alongside this
-prompt (driven by the 2026-05-06 SEO-pitch breakthrough at CDC, see
-the v0.4.0 entry in `CHANGELOG.rst`). The new SDK `@bradstancel/clienthub-sdk@0.4.0`
-will be on the private registry at
-`https://npm.onlinesalessystems.com/` after the tag-triggered
-publish workflow runs. **The existing v0.3.6 integration keeps
-working unchanged** — adopting v0.4.0 closes two real defects on
-the consumer-site side that aren't covered by the Client Hub fix
-alone.
+**Historical handoff status:** Client Hub v0.4.0 was released in
+May 2026 after the CDC SEO-pitch breakthrough documented in the
+v0.4.0 `CHANGELOG.rst` entry. The matching
+`@bradstancel/clienthub-sdk@0.4.0` is published at
+`https://npm.onlinesalessystems.com/`. CDC completed this handoff in
+commit `6545b3f` and now pins `^0.4.0`; retain this document as the
+implementation record for that consumer adoption.
 
 ## TL;DR
 
@@ -241,10 +239,10 @@ After deploy:
   vs proxy peer" and "Phone validation: digit count vs NANP area
   code".
 - `docs/Cross-Project-Integration.rst` — the canonical
-  `lib/client-hub.ts` reference module will be updated after both
-  consumer sites adopt v0.4.0.
+  `lib/client-hub.ts` reference module now includes the v0.4.0
+  communication metadata contract.
 
-Adoption is on your schedule. The Client Hub-side fixes are
-fix-forward and don't require this consumer-site work to land —
-but the long-term contract is "every API call carries
-`externalRefsJson` with `ip_address`", so the sooner the better.
+The Client Hub-side fixes were fix-forward; CDC's completed adoption
+ensures the long-term contract is also met: every communication call
+carries `externalRefsJson` with `ip_address` when that metadata is
+available.

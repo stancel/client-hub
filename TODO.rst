@@ -369,9 +369,10 @@ the fleet scale arrives, sequenced smallest-first.
   fleet ``_schema_migrations`` + heartbeats; admin UI shows
   "29/52 instances are on v1.4.2; 23 are still on v1.3.x; 2
   failed last upgrade"
-- [ ] SDK package publishing to PyPI / npm / Packagist (today
-  the SDKs are committed in-tree — fine for 2 instances, not for
-  hundreds)
+- [ ] Publish the generated Python SDK to PyPI and PHP SDK to
+  Packagist. The TypeScript SDK already publishes to the private npm
+  registry as ``@bradstancel/clienthub-sdk``; all generated SDKs also
+  remain committed in-tree.
 - [ ] Provisioning automation (Terraform / Ansible) so a new
   instance is one command from "VPS exists" to "Client Hub
   running with auto-upgrade enabled"
@@ -460,10 +461,10 @@ Phase 16 — v0.3.2 follow-ups [COMPLETE]
 Phase 16 — v0.3.3 follow-ups [COMPLETE]
 ----------------------------------------------------------------------
 
-- [x] ``scripts/install.sh`` now rejects ``bootstrap`` as the first
-  source code and requires ``--first-source-code`` /
-  ``--first-source-name`` / ``--first-source-domain`` /
-  ``--first-source-type``. Future installs cannot reproduce the
+- [x] ``scripts/install.sh`` now requires a non-``bootstrap``
+  ``--first-source-code`` (and ``--business-name``). The source name
+  defaults to ``<business name> Website``; domain is optional; source
+  type defaults to ``website``. Future installs cannot reproduce the
   CO-shaped "bootstrap-as-runtime-identity" state.
 - [x] ``scripts/install.sh`` now collects + INSERTs into
   ``business_settings`` (``--business-name`` required;
@@ -711,18 +712,18 @@ defects, all fixed here.
   email-substring + body phrase-combo end-to-end rejections.
   Test count 180 → 217.
 - [x] Handoff prompts: ``docs/handoffs/cdc-v0.4.0.md`` and
-  ``docs/handoffs/clever-orchid-v0.4.0.md`` — both consumer sites
-  need to (1) bump to ``@bradstancel/clienthub-sdk@^0.4.0``,
-  (2) add ``externalRefsJson`` to the ``createCommunicationApiV1Communications``
-  call in ``logConversion`` and ``appendCommunication``, and
-  (3) mirror the ``NANP_AREA_CODES`` set into ``lib/spam-filter.ts``
-  with an ``isValidNanpAreaCode`` helper wired into form-submit
-  pre-validation. Adoption on each consumer's own schedule.
-- [ ] **TODO:** confirm CDC and Clever Orchid each adopt the
-  v0.4.0 handoff. After both confirm, update
-  ``docs/Cross-Project-Integration.rst`` reference module to
-  include ``externalRefsJson`` on the comm call (the canonical
-  module currently reflects the v0.3.6 surface).
+  ``docs/handoffs/clever-orchid-v0.4.0.md`` documented the required
+  consumer work: bump to ``@bradstancel/clienthub-sdk@^0.4.0``, pass
+  ``externalRefsJson`` on ``logConversion`` and
+  ``appendCommunication`` comm calls, and mirror
+  ``NANP_AREA_CODES`` in ``lib/spam-filter.ts``.
+- [x] Consumer adoption confirmed locally: CDC adopted v0.4.0 in
+  ``6545b3f`` and Clever Orchid in ``0386b42``. Both pin
+  ``@bradstancel/clienthub-sdk@^0.4.0``, forward
+  ``externalRefsJson`` on communication writes, and validate NANP
+  area codes at the website edge. The canonical reference module in
+  ``docs/Cross-Project-Integration.rst`` now carries the same
+  contract.
 - [ ] **TODO:** annual NANPA registry refresh — re-pull
   ``NANP_AREA_CODES`` from the assignment registry and diff
   against the in-code list. Calendar reminder for 2027-05.
@@ -730,14 +731,6 @@ defects, all fixed here.
   breakthrough — soft-delete ``contacts.id=29`` + leave
   ``communications.id=33`` intact for pattern-tuning forensics;
   insert a backdated ``spam_events`` row for the audit trail.
-
-.. _client-hub-todo-v0-3-7-queue:
-
-v0.3.7 queue (next time we cut a versioned release)
-----------------------------------------------------------------------
-
-Empty. Open suggestions land here as they arrive from the consumer
-sites or from operational use of the v0.3.6 deploy orchestrator.
 
 .. _client-hub-todo-v0-4-x-design:
 

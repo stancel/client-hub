@@ -117,10 +117,11 @@ What the Installer Does (v0.3.3+)
 - ``--first-source-code`` is **required** and rejects ``bootstrap``.
   An install that doesn't supply a code (or that explicitly tries
   to set the code to ``bootstrap``) fails with a pointed error.
-- ``--first-source-name``, ``--first-source-domain``, and
-  ``--first-source-type`` round out the row. Domain is plumbed in
-  at create time so the marketing-source derivation can use it
-  authoritatively.
+- ``--first-source-name`` defaults to ``<business name> Website``
+  when omitted; ``--first-source-domain`` is optional; and
+  ``--first-source-type`` defaults to ``website``. Supplying a domain
+  at create time lets marketing-source derivation classify same-domain
+  referrers authoritatively.
 - The install-generated API key is attached to that named source,
   not to ``bootstrap``. The bootstrap row is left untouched and
   remains orphan-eligible for migration 029.

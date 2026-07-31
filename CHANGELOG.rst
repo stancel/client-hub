@@ -4,6 +4,33 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-unreleased:
+
+Unreleased — Documentation synchronization
+======================================================================
+
+Verified the current repository, local development environment,
+private SDK registry, production API VPSes, and both local consumer
+repositories. Corrected stale operational documentation without
+changing application behavior:
+
+- Project inventory now reflects 30 production migrations through 031,
+  217 tests across 24 modules, 69 active spam patterns, and v0.4.0
+  production deployments.
+- The canonical consumer integration guide now reflects both sites'
+  ``@bradstancel/clienthub-sdk@^0.4.0`` pins, their confirmed v0.4.0
+  adoption commits, and the required ``externalRefsJson`` metadata on
+  every communication write.
+- Historical v0.4.0 handoff prompts now record completion rather than
+  describing an upcoming release; TODO records the completed consumer
+  adoption and retains only verified open operational work.
+- Corrected the installer documentation to distinguish required
+  ``--business-name`` / non-``bootstrap`` ``--first-source-code``
+  arguments from optional source-domain and defaulted source metadata.
+- Corrected the earlier v0.4.0 changelog claim that CDC breakthrough
+  cleanup had already run. The production cleanup remains explicitly
+  pending until it is executed and verified.
+
 .. _client-hub-changelog-v0-4-0:
 
 v0.4.0 — 2026-05-06 — Canonical visitor IP, NANP area-code validation, SEO-pitch hardening
@@ -96,11 +123,12 @@ Orchid sessions to update ``logConversion`` and
 ``ip_address`` and ``user_agent``) on the comm call too. Adoption
 on each consumer's own schedule.
 
-**Cleanup.** The original Davis Brown contact (id 29) and
-communication (id 33) on CDC are soft-deleted via a one-off SQL
-run, with a backdated ``spam_events`` row inserted for the audit
-trail. The communication body is intentionally left intact so it
-remains queryable for future pattern tuning.
+**Pending post-deploy cleanup.** The original Davis Brown CDC
+breakthrough still needs a separately verified one-off operational SQL
+run: soft-delete ``contacts.id=29``, retain ``communications.id=33``
+and its body for pattern-tuning forensics, then insert a backdated
+``spam_events`` audit row. This is intentionally tracked unchecked in
+``TODO.rst`` until the production operation is completed and verified.
 
 .. _client-hub-changelog-v0-3-6:
 

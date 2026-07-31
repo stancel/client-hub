@@ -126,8 +126,8 @@ Database Configuration
      - 3 (``v_contact_summary``, ``v_contact_last_order``,
        ``v_events_by_source``)
    * - Migrations
-     - 28 files in ``migrations/`` (numbered 001-029, with 012 in
-       ``migrations/dev/`` as CI/dev seed data)
+     - 30 production files (001-031, excluding 012) plus
+       ``migrations/dev/012_seed_test_data.sql`` for CI/dev seed data
 
 .. _client-hub-arch-env:
 
@@ -198,7 +198,7 @@ Pydantic v2.
        ``ctx.source_id`` onto every authenticated write
    * - Tests
      - ``api/tests/``
-     - 180 tests across 22 files (TDD, real DB)
+     - 217 tests across 24 files (TDD, real DB)
 
 .. _client-hub-arch-data-model:
 
@@ -285,7 +285,9 @@ Auto-generated from the OpenAPI spec at ``/openapi.json`` using
 
 - **Python** — ``sdks/python/`` — pip-installable ``clienthub``
 - **PHP** — ``sdks/php/`` — Composer-compatible
-- **TypeScript** — ``sdks/typescript/`` — npm-compatible, ES6
+- **TypeScript** — ``sdks/typescript/`` — ES6-compatible and
+  published privately as ``@bradstancel/clienthub-sdk`` on
+  ``https://npm.onlinesalessystems.com/``
 
 Regenerate: ``./scripts/generate-sdks.sh``
 

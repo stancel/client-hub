@@ -4,15 +4,13 @@
 **Clever Orchid Next.js consumer site** at
 `/home/brad/Sites/clever-orchid-website`.
 
-**Status:** Client Hub v0.4.0 is being released alongside this
-prompt (driven by a 2026-05-06 SEO-pitch breakthrough at the
-sister CDC site, see the v0.4.0 entry in `CHANGELOG.rst`). The new
-SDK `@bradstancel/clienthub-sdk@0.4.0` will be on the private
-registry at `https://npm.onlinesalessystems.com/` after the
-tag-triggered publish workflow runs. **The existing v0.3.6
-integration keeps working unchanged** — adopting v0.4.0 closes
-two real defects on the consumer-site side that aren't covered by
-the Client Hub fix alone.
+**Historical handoff status:** Client Hub v0.4.0 was released in
+May 2026 after the CDC SEO-pitch breakthrough documented in the
+v0.4.0 `CHANGELOG.rst` entry. The matching
+`@bradstancel/clienthub-sdk@0.4.0` is published at
+`https://npm.onlinesalessystems.com/`. Clever Orchid completed this
+handoff in commit `0386b42` and now pins `^0.4.0`; retain this
+prompt as the implementation record for that consumer adoption.
 
 The same investigation that prompted this prompt found no Clever
 Orchid breakthrough rows in production — but the underlying defect
@@ -72,12 +70,11 @@ pulls these automatically.
 
 ## Specifics — changes in `lib/client-hub.ts`
 
-The CDC handoff at
-`docs/handoffs/cdc-v0.4.0.md` has the full code snippets for
-`logConversion` and `appendCommunication` — Clever Orchid's
-`lib/client-hub.ts` should match the same shape after v0.3.6
-synthesis (per `docs/Cross-Project-Integration.rst`), so the same
-edits apply verbatim. Re-read that handoff for the diff blocks.
+The CDC handoff at `docs/handoffs/cdc-v0.4.0.md` retains the full
+code snippets for `logConversion` and `appendCommunication`. Clever
+Orchid implemented the corresponding v0.4.0 contract in `0386b42`;
+the current shared reference is
+`docs/Cross-Project-Integration.rst`.
 
 ## Specifics — changes in `lib/spam-filter.ts`
 
@@ -109,7 +106,5 @@ After deploy:
   vs proxy peer" and "Phone validation: digit count vs NANP area
   code".
 
-Adoption is on your schedule. The Client Hub-side fixes are
-fix-forward and don't require this consumer-site work to land —
-but converging the consumer-site contract closes the remaining
-gap.
+The Client Hub-side fixes were fix-forward. Clever Orchid's
+completed adoption closes the remaining consumer-side contract gap.

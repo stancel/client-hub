@@ -21,7 +21,7 @@
   SDK is published to the private npm registry as
   `@bradstancel/clienthub-sdk` on `https://npm.onlinesalessystems.com/`
   (Verdaccio at `~/docker/verdaccio/`); both consumer Next.js sites
-  consume it from there as of v0.3.5.
+  consume it from there at `^0.4.0`.
 - **CI/CD:** GitHub Actions — `ci.yml` (lint → test → build → SDK
   gen on push/PR to master), `publish-sdk.yml` (tag-triggered;
   publishes the TypeScript SDK to Verdaccio on every `v*` tag using
@@ -30,14 +30,14 @@
   VPSes; `scripts/upgrade.sh --yes` for upgrades on a single VPS;
   `scripts/deploy-all-vpses.sh` for one-command rollout across the
   entire fleet (reads `deploy/vpses.txt`); two production VPSes
-  running v0.3.6:
+  healthy on v0.4.0:
   - `client-hub-complete-dental-care.onlinesalessystems.com` (CDC)
   - `client-hub-clever-orchid.onlinesalessystems.com` (Clever Orchid)
 - **Production consumer sites:** Complete Dental Care
   (`completedentalcarecolumbia.com`, source code
   `complete_dental_care_website`) and Clever Orchid
   (`cleverorchid.com`, source code `clever_orchid_website`). Both
-  consume `@bradstancel/clienthub-sdk@^0.3.5`. See
+  consume `@bradstancel/clienthub-sdk@^0.4.0`. See
   `docs/Cross-Project-Integration.rst` for the canonical integration
   pattern and the consumers register.
 
@@ -92,8 +92,8 @@ client-hub/
 ├── api/                                  # FastAPI application (Python 3.12)
 │   ├── app/                              # Models, routers, schemas, services, middleware
 │   ├── VERSION                           # Single source of truth — read by FastAPI at startup, stamped into SDKs by generate-sdks.sh, mirrored in the vX.Y.Z git tag
-│   └── tests/                            # 180 tests across 22 files
-├── migrations/                           # 28 numbered SQL migrations (001-029; 012 in dev/)
+│   └── tests/                            # 217 tests across 24 files
+├── migrations/                           # 30 production SQL migrations (001-031, excluding 012) + dev seed
 │   └── dev/                              # Dev/CI-only seed data (012_seed_test_data.sql)
 ├── scripts/                              # install.sh, uninstall.sh, bootstrap-migrations.sh,
 │                                         # upgrade.sh, deploy-all-vpses.sh,
@@ -141,7 +141,7 @@ client-hub/
 | Spam admin (root-key) | `GET/POST /api/v1/admin/spam-patterns`, `PUT/DELETE /api/v1/admin/spam-patterns/{uuid}`, `GET /api/v1/admin/spam-events`, `GET /api/v1/admin/spam-events/stats`, `POST /api/v1/admin/spam-events/{uuid}/mark-false-positive` |
 | Marketing sources (public) | `GET /api/v1/marketing-sources` (source-key gated; consumer-site sync of canonical attribution codes — mirrors `/spam-patterns`) |
 
-**Spam-defense framework:** every public-ish endpoint inherits a 5-line spam guard via `app.services.spam_filter_service.spam_check_or_raise`. Patterns are DB-driven (`spam_patterns` table, 57 seeded across migrations 023 + 024), rejections logged to `spam_events`, sliding-window rate-limit (10 min window) in `spam_rate_log` with per-key thresholds: `email=1`, `email_body_hash=1`, `ip=5`. Soft-signal events (single-phrase grazes below the rejection threshold) are logged as `rejection_reason='soft_signal'` for operator review without rejection. See `docs/Spam-Defense-Pattern.rst` for the inheritance pattern when adding new integrations.
+**Spam-defense framework:** every public-ish endpoint inherits a 5-line spam guard via `app.services.spam_filter_service.spam_check_or_raise`. Patterns are DB-driven (`spam_patterns` table; 69 active patterns after migrations 023, 024, and 031), rejections logged to `spam_events`, sliding-window rate-limit (10 min window) in `spam_rate_log` with per-key thresholds: `email=1`, `email_body_hash=1`, `ip=5`. Soft-signal events (single-phrase grazes below the rejection threshold) are logged as `rejection_reason='soft_signal'` for operator review without rejection. See `docs/Spam-Defense-Pattern.rst` for the inheritance pattern when adding new integrations.
 
 **Canonical client IP capture (v0.4.0+):** any ingest adapter must call `app.services.request_meta.extract_request_meta(request, payload_external_refs=...)` instead of reading `request.client.host` directly. Returns a 3-tuple `(canonical_ip, peer_ip, user_agent)`:
 
@@ -263,7 +263,7 @@ docker compose down && docker compose build --no-cache && docker compose up -d
 
 Every API endpoint has a corresponding test. Tests hit the real database.
 
-- **180 tests** across 22 test files
+- **217 tests** across 24 test files
 - Framework: pytest + httpx + AsyncClient
 - Run: `cd api && .venv/bin/python -m pytest tests/ -v`
 - Coverage: `pytest --cov=app --cov-report=term-missing`

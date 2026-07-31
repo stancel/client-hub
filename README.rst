@@ -138,7 +138,7 @@ Quick Info
    * - **MCP Tools**
      - ``apisix-mysql`` (``execute_sql``, ``search_objects``)
    * - **Production deployments**
-     - Two instances; v0.4.0 rolls out via
+     - Two healthy v0.4.0 instances, deployed via
        ``scripts/deploy-all-vpses.sh``:
        ``client-hub-complete-dental-care.onlinesalessystems.com``
        (Complete Dental Care) and
@@ -415,7 +415,7 @@ Testing
 **********************************************************************
 
 Test Driven Development (TDD) — every endpoint has tests.
-180 tests across 22 files, all hitting the real database.
+217 tests across 24 files, all hitting the real database.
 
 .. code-block:: bash
 
@@ -535,8 +535,8 @@ Project Structure
    │   │   ├── services/                     # Business logic
    │   │   └── middleware/                   # API key auth (root + source-scoped)
    │   ├── VERSION                           # Source of truth — read by FastAPI at startup, stamped into SDKs
-   │   └── tests/                            # 180 tests, 22 files
-   ├── migrations/                           # 28 numbered SQL files (001-029)
+   │   └── tests/                            # 217 tests, 24 files
+   ├── migrations/                           # 30 production SQL files (001-031, excluding 012)
    │   └── dev/                              # Dev/CI-only seed data
    │       └── 012_seed_test_data.sql
    ├── scripts/                              # 13 shell scripts + 7 one-shot SQL scripts

@@ -69,13 +69,12 @@ workflow, never by consumer sites). Then:
 
 .. code-block:: bash
 
-   npm install @bradstancel/clienthub-sdk@^0.3.5
+   npm install @bradstancel/clienthub-sdk@^0.4.0
 
-The ``^0.3.5`` range pulls the latest 0.3.x patch on every fresh
-``npm install`` / ``npm ci``; major-version bumps (0.4.x and beyond)
-are opt-in and require an explicit version change in
-``package.json``. Every Client Hub release publishes the matching
-SDK version automatically via the tag-triggered
+The ``^0.4.0`` range pulls the latest 0.4.x patch on every fresh
+``npm install`` / ``npm ci``. A later minor-version bump requires an
+explicit ``package.json`` change. Every Client Hub release publishes
+the matching SDK version automatically via the tag-triggered
 ``.github/workflows/publish-sdk.yml`` workflow in the Client Hub
 repo.
 
@@ -314,6 +313,7 @@ site exposes to its own callers.
              occurredAt,
              subject: input.subject ?? "",
              body: input.body ?? "",
+             externalRefsJson: externalRefs,
            },
          },
          { signal },
@@ -339,6 +339,10 @@ site exposes to its own callers.
      body?: string;
      /** Override the event occurrence time (defaults to now, UTC). */
      occurredAt?: string;
+     /** Visitor IP for this follow-up event, from trusted request headers. */
+     ipAddress?: string;
+     /** Visitor User-Agent for this follow-up event. */
+     userAgent?: string;
    }
 
    /**
@@ -384,6 +388,12 @@ site exposes to its own callers.
          return;
        }
 
+       const externalRefs: Record<string, unknown> = {
+         ip_address: input.ipAddress,
+         user_agent: input.userAgent,
+         site_source_code: CLIENTHUB_SOURCE_CODE,
+       };
+
        await communications.createCommunicationApiV1CommunicationsPost(
          {
            commCreate: {
@@ -393,6 +403,7 @@ site exposes to its own callers.
              occurredAt,
              subject: input.subject ?? "",
              body: input.body ?? "",
+             externalRefsJson: externalRefs,
            },
          },
          { signal },
@@ -604,15 +615,15 @@ a site upgrades.
    * - Complete Dental Care
        (``completedentalcarecolumbia.com``)
      - ``complete_dental_care_website``
-     - ``^0.3.5``
+     - ``^0.4.0``
      - ``client-hub-complete-dental-care.onlinesalessystems.com``
-     - ``0b46c9e`` (2026-05-05)
+     - ``6545b3f`` (v0.4.0 adoption)
    * - Clever Orchid
        (``cleverorchid.com``)
      - ``clever_orchid_website``
-     - ``^0.3.5``
+     - ``^0.4.0``
      - ``client-hub-clever-orchid.onlinesalessystems.com``
-     - ``6524034`` (2026-05-05)
+     - ``0386b42`` (v0.4.0 adoption)
 
 Both consumer sites use only ``ContactsApi``,
 ``CommunicationsApi``, and ``LookupApi`` from the SDK today —
@@ -635,8 +646,8 @@ When changing the SDK, the matrix to think about:
 3. **OpenAPI spec → SDK regeneration cadence** — every Client Hub
    release auto-publishes the matching SDK version via
    ``.github/workflows/publish-sdk.yml``. Consumer sites pinned at
-   ``^0.3.x`` pick up patch versions on their next ``npm install``;
-   ``0.4.x`` is opt-in.
+   ``^0.4.x`` pick up patch versions on their next ``npm install``;
+   a later minor-version range is opt-in.
 
 .. _client-hub-cp-checklist:
 
@@ -649,7 +660,7 @@ following in the site's ``lib/client-hub.ts`` and every caller:
 
 - [ ] ``.npmrc`` configured for ``@bradstancel:registry=...``;
   ``NPM_TOKEN`` set as the install-time consumer token
-- [ ] ``@bradstancel/clienthub-sdk@^0.3.5`` (or current published
+- [ ] ``@bradstancel/clienthub-sdk@^0.4.0`` (or current published
   version) added to ``package.json`` and resolved in
   ``package-lock.json``
 - [ ] ``CLIENTHUB_URL`` / ``CLIENTHUB_API_KEY`` /

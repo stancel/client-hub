@@ -2711,7 +2711,7 @@ Complete Table List
 42. v_events_by_source — cross-source event stream joining
     contacts, communications, sources (added migration 017)
 
-**Total: 39 tables + 3 views (as of migration 029).**
+**Total: 39 tables + 3 views (through migration 031).**
 
 .. note::
 
