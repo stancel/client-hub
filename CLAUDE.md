@@ -4,10 +4,14 @@
 
 **Client Hub** is a **data-first customer intelligence microservice** — a centralized, business-agnostic MariaDB data store that compiles and enriches information from disparate systems (invoicing, marketing, telephony, chat, support, scheduling, web scraping) into a single source of truth. The database schema is the primary product; the REST API is a convenience layer. Both DB-level and API-level integration are valid patterns.
 
-- **App location:** `~/docker/client-hub/`
-- **API URL:** http://10.0.1.220:8800
-- **Swagger UI:** http://10.0.1.220:8800/docs
-- **OpenAPI Spec:** http://10.0.1.220:8800/openapi.json
+- **App location (dev):** **cloud-cybertron** since 2026-10-16, in
+  `/srv/apps/client-hub/` (also `~/docker/client-hub/` there, through
+  the `~/docker` → `/srv/apps` link). Cybertron's copy is stopped; see
+  "Where the Dev Instance Runs" below.
+- **API URL:** on cloud-cybertron http://localhost:8800; from a tailnet
+  device http://100.115.75.50:8800
+- **Swagger UI:** http://localhost:8800/docs (on cloud-cybertron)
+- **OpenAPI Spec:** http://localhost:8800/openapi.json (on cloud-cybertron)
 - **Public URL:** None (will be exposed after live integrations are proven)
 - **GitHub:** https://github.com/stancel/client-hub
 - **Version:** 0.4.0 (single source of truth: `api/VERSION`; FastAPI
@@ -41,6 +45,34 @@
   `docs/Cross-Project-Integration.rst` for the canonical integration
   pattern and the consumers register.
 
+### Where the Dev Instance Runs
+
+The dev instance moved from Cybertron to **cloud-cybertron** (the AWS
+host built by `~/DevOps-Personal/OpenTofu/pf-aws-platform`) on
+2026-10-16, at Brad's request. pf-aws-platform's `laptop.sh
+clienthub-move` did the move. It copied the `clienthub` database with
+every table's count checked (39 tables, 4,610 rows on both sides) and
+stopped Cybertron's API. The production VPSes are unaffected.
+
+- **Run commands on cloud-cybertron** (`ssh cloud-cybertron`). On
+  Cybertron, `client-hub-api` is stopped and stays down after a reboot.
+- **Database:** the host's own mariadb (`mariadb:3306` on
+  `my-main-net`), which also runs there. **Cybertron's mariadb still
+  holds the old `clienthub` copy from the move; do not use it.**
+- **MCP (`apisix-mysql`):** it reaches the mariadb on the machine whose
+  gateway serves the session. In a Claude Code session on cloud-cybertron
+  that is the live `clienthub`; in one on Cybertron, the old copy.
+- **Code:** cloned from GitHub by pf-aws-platform. A live app is not
+  updated automatically. To deploy a change on the host: `cd
+  ~/docker/client-hub && git pull && docker compose up -d --build`.
+- **`.env`:** the copy on the host is the live one. It was first
+  rendered from Parameter Store (`/pf/cloud-cybertron/client-hub/`).
+- **Backups:** the host's nightly backup to S3 (02:15 New York time)
+  covers this folder and mariadb, `clienthub` included.
+- **Back to Cybertron:** `bash ~/laptop.sh clienthub-rollback` on Brad's
+  laptop (pf-aws-platform). It does not carry changes made on the host
+  back.
+
 ### Data Sources That Feed Into Client Hub
 
 | System | What It Provides | Integration Method |
@@ -60,10 +92,10 @@ Client Hub does **not** run its own database container. It uses the shared Maria
 
 | Detail | Value |
 |---|---|
-| MariaDB project | `~/docker/mariadb/` |
+| MariaDB project | `~/docker/mariadb/` (on cloud-cybertron, `/srv/apps/mariadb/`) |
 | MariaDB version | 12.2.2 |
 | Docker DNS | `mariadb:3306` (via `my-main-net`) |
-| Host access | `10.0.1.220:3306` |
+| Host access | `127.0.0.1:3306` on cloud-cybertron (`100.115.75.50:3306` over Tailscale) |
 | Database name | `clienthub` |
 | MCP tools | `apisix-mysql` (`execute_sql`, `search_objects`) via `~/docker/mysql-mcp-server/` |
 
@@ -114,7 +146,7 @@ client-hub/
 ├── .github/                              # CI/CD workflows: ci.yml (lint→test→build→
 │                                         # SDK gen on push/PR) + publish-sdk.yml
 │                                         # (tag-triggered npm publish to Verdaccio)
-├── docker-compose.yml                    # Local Cybertron compose (my-main-net, shared mariadb)
+├── docker-compose.yml                    # Dev compose, on cloud-cybertron since 2026-10-16 (my-main-net, shared mariadb)
 ├── docker-compose.bundled.yml            # Production bundled (API + MariaDB + Caddy with TLS)
 ├── docker-compose.bundled-nodomain.yml   # Production bundled (no TLS)
 ├── docker-compose.override.yml.example   # OpsInsights cross-DB access example
@@ -174,6 +206,8 @@ canonical payload contract.
 
 ## Key Commands
 
+Run these on cloud-cybertron, where the dev instance runs.
+
 ```bash
 # API status
 cd ~/docker/client-hub && docker compose ps
@@ -188,7 +222,7 @@ docker compose restart client-hub-api
 docker compose down && docker compose build && docker compose up -d
 
 # Connect to database
-mariadb -h 10.0.1.220 -P 3306 -u root -p clienthub
+mariadb -h 127.0.0.1 -P 3306 -u root -p clienthub
 
 # Run tests
 cd api && .venv/bin/python -m pytest tests/ -v
@@ -214,6 +248,8 @@ curl -fsSL https://raw.githubusercontent.com/stancel/client-hub/master/scripts/i
 
 ## Troubleshooting
 
+On cloud-cybertron:
+
 ```bash
 # Check API container
 docker compose ps
@@ -223,13 +259,13 @@ docker compose logs --tail=50 client-hub-api
 cd ~/docker/mariadb && docker compose ps
 
 # Test database connectivity
-mariadb -h 10.0.1.220 -P 3306 -u root -p -e "USE clienthub; SELECT COUNT(*) FROM contacts;"
+mariadb -h 127.0.0.1 -P 3306 -u root -p -e "USE clienthub; SELECT COUNT(*) FROM contacts;"
 
 # Test API health
-curl -s http://10.0.1.220:8800/api/v1/health | python3 -m json.tool
+curl -s http://localhost:8800/api/v1/health | python3 -m json.tool
 
 # Test authenticated endpoint
-curl -s -H "X-API-Key: dev-api-key" http://10.0.1.220:8800/api/v1/contacts | python3 -m json.tool
+curl -s -H "X-API-Key: dev-api-key" http://localhost:8800/api/v1/contacts | python3 -m json.tool
 
 # Check MCP server is available
 cd ~/docker/mysql-mcp-server && docker compose ps

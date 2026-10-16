@@ -4,6 +4,26 @@
 Client Hub — Changelog
 ######################################################################
 
+.. _client-hub-changelog-unreleased-cloud-cybertron:
+
+Unreleased — The dev instance moves to cloud-cybertron
+======================================================================
+
+On 2026-10-16 the dev instance moved from Cybertron to cloud-cybertron,
+the AWS host built by pf-aws-platform, at Brad's request. pf-aws-platform's
+``laptop.sh clienthub-move`` copied the ``clienthub`` database with
+every table's count checked (39 tables, 4,610 rows on both sides),
+started the API there (health: database connected) and stopped
+Cybertron's. No application code changed, and the production VPSes are
+unaffected.
+
+- ``CLAUDE.md``: where the dev instance runs and how to reach it
+  (``localhost:8800`` on the host, ``100.115.75.50:8800`` over
+  Tailscale). Cybertron's mariadb keeps an old ``clienthub`` copy that
+  must not be used, and ``apisix-mysql`` reaches the live database only
+  from a session on the host. Also covered: deploying a change there,
+  backups, and the rollback. Commands now use the host's addresses.
+
 .. _client-hub-changelog-unreleased:
 
 Unreleased — Documentation synchronization
